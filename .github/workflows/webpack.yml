@@ -8,7 +8,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
       # Check out the code
       - name: Check out code
@@ -27,6 +27,12 @@ jobs:
       # Build the Vite project
       - name: Build the project
         run: npm run build
+
+      # Configure git user for commits
+      - name: Configure git user
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
 
       # Deploy to GitHub Pages
       - name: Deploy to GitHub Pages
