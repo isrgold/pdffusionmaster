@@ -75,7 +75,7 @@ This project is licensed under the [MIT License](LICENSE).
 
 ## 🌎 Live Demo
 
-Visit the live app at: **[yourusername.github.io/vite-pdf-merger](https://yourusername.github.io/vite-pdf-merger)**
+Visit the live app at: **[isrgold.github.io/pdffusionmaster](https://isrgold.github.io/pdffusionmaster/)**
 
 ---
 
