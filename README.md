@@ -21,8 +21,8 @@ PDF Merger is a privacy-focused, client-side tool for merging multiple PDF files
 ### Clone the Repository
 
 ```sh
-git clone https://github.com/yourusername/vite-pdf-merger.git
-cd vite-pdf-merger
+git clone https://github.com/isrgold/pdffusionmaster.git
+cd pdffusionmaster
 ```
 
 ### Install Dependencies
