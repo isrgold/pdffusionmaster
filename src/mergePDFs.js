@@ -1,6 +1,7 @@
+import {PDFDocument} from 'pdf-lib';
+
 export async function mergePDFs(files, setStatus, setFiles) {
-    const { PDFDocument } = await import('pdf-lib'); // Lazy load pdf-lib
-  
+    // const { PDFDocument } = await import('pdf-lib'); // Lazy load pdf-lib
     if (files.length < 2) {
       setStatus({ type: 'error', message: 'Please select at least 2 PDF files to merge' });
       return;

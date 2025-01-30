@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import DragDropArea from './DragDropArea';
 import FileList from './FileList';
@@ -9,6 +9,22 @@ const PDFMerger = () => {
   const [files, setFiles] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
   const [status, setStatus] = useState({ type: '', message: '' });
+  const [mergePDFs, setMergePDFs] = useState(null); // state for the dynamically imported function
+  const [isMerging, setIsMerging] = useState(false); // Track merge state for loading indicator
+
+  // Dynamically load the mergePDFs function after the component renders
+  useEffect(() => {
+    const loadMergePDFs = async () => {
+      try {
+        const { mergePDFs } = await import('@/mergePDFs');
+        setMergePDFs(() => mergePDFs); // Set the mergePDFs function once it's loaded
+      } catch (error) {
+        setStatus({ type: 'error', message: 'Failed to load merge function.' });
+      }
+    };
+
+    loadMergePDFs();
+  }, []); // This effect runs only once after the component mounts
 
   const handleDragOver = useCallback((e) => {
     e.preventDefault();
@@ -37,8 +53,19 @@ const PDFMerger = () => {
   }, []);
 
   const handleMergePDFs = async () => {
-    const { mergePDFs } = await import('./mergePDFs'); // Lazy load merge function
-    await mergePDFs(files, setStatus, setFiles);
+    if (!mergePDFs) {
+      setStatus({ type: 'error', message: 'Merge function not loaded yet.' });
+      return;
+    }
+
+    setIsMerging(true);
+    try {
+      await mergePDFs(files, setStatus, setFiles);
+    } catch (error) {
+      setStatus({ type: 'error', message: 'An error occurred while merging PDFs.' });
+    } finally {
+      setIsMerging(false);
+    }
   };
 
   return (
@@ -57,7 +84,11 @@ const PDFMerger = () => {
           />
           {files.length > 0 && <FileList files={files} removeFile={removeFile} />}
           <StatusAlert status={status} />
-          <MergeButton files={files} mergePDFs={handleMergePDFs} />
+          <MergeButton
+            files={files}
+            mergePDFs={handleMergePDFs}
+            disabled={isMerging || files.length === 0 || !mergePDFs} // Disable button if merging is in progress or no files
+          />
         </CardContent>
       </Card>
     </div>
