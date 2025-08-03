@@ -1,19 +1,25 @@
 // components/SignatureModal.jsx
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Check } from 'lucide-react';
+import { X, Check, Type } from 'lucide-react';
 
 const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
   const [isDrawing, setIsDrawing] = useState(false);
   const [signaturePaths, setSignaturePaths] = useState([]);
   const [signatureColor, setSignatureColor] = useState('#000000');
+  const [textElements, setTextElements] = useState([]);
+  const [mode, setMode] = useState('draw'); // 'draw' or 'text'
+  const [draggedElement, setDraggedElement] = useState(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [activeTextElement, setActiveTextElement] = useState(null);
+  const [fontSize, setFontSize] = useState(16);
   
   const canvasRef = useRef(null);
 
   useEffect(() => {
-    if (show && signaturePaths.length > 0) {
-      drawSignatureOnCanvas();
+    if (show) {
+      redrawCanvas();
     }
-  }, [signaturePaths, signatureColor, show]);
+  }, [signaturePaths, signatureColor, textElements, show]);
 
   const getMousePos = (e) => {
     const canvas = canvasRef.current;
@@ -24,12 +30,14 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
     };
   };
 
-  const drawSignatureOnCanvas = () => {
+  const redrawCanvas = () => {
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
+    if (!canvas) return;
     
+    const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
+    // Draw signature paths
     if (signaturePaths.length > 0) {
       ctx.strokeStyle = signatureColor;
       ctx.lineWidth = 2;
@@ -47,14 +55,69 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
         }
       });
     }
+    
+    // Draw text elements
+    textElements.forEach(textEl => {
+      ctx.fillStyle = textEl.color;
+      ctx.font = `${textEl.fontSize}px Arial`;
+      ctx.fillText(textEl.text, textEl.x, textEl.y);
+      
+      // Draw selection border if dragging or active
+      if ((draggedElement && draggedElement.id === textEl.id) || 
+          (activeTextElement && activeTextElement.id === textEl.id)) {
+        const metrics = ctx.measureText(textEl.text);
+        ctx.strokeStyle = '#007bff';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([5, 5]);
+        ctx.strokeRect(
+          textEl.x - 2, 
+          textEl.y - textEl.fontSize - 2, 
+          metrics.width + 4, 
+          textEl.fontSize + 4
+        );
+        ctx.setLineDash([]);
+        
+        // Draw cursor if active
+        if (activeTextElement && activeTextElement.id === textEl.id) {
+          const cursorX = textEl.x + metrics.width;
+          ctx.strokeStyle = '#000';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([]);
+          ctx.beginPath();
+          ctx.moveTo(cursorX, textEl.y - textEl.fontSize);
+          ctx.lineTo(cursorX, textEl.y);
+          ctx.stroke();
+        }
+      }
+    });
+  };
+
+  const getTextElementAt = (x, y) => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    
+    for (let i = textElements.length - 1; i >= 0; i--) {
+      const textEl = textElements[i];
+      ctx.font = `${textEl.fontSize}px Arial`;
+      const metrics = ctx.measureText(textEl.text);
+      
+      if (x >= textEl.x && 
+          x <= textEl.x + metrics.width && 
+          y >= textEl.y - textEl.fontSize && 
+          y <= textEl.y) {
+        return textEl;
+      }
+    }
+    return null;
   };
 
   const createSignaturePNG = () => {
-    if (signaturePaths.length === 0) return null;
+    if (signaturePaths.length === 0 && textElements.length === 0) return null;
     
-    // Find bounds
+    // Find bounds including both paths and text
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     
+    // Check signature paths
     signaturePaths.forEach(path => {
       path.forEach(point => {
         minX = Math.min(minX, point.x);
@@ -63,6 +126,25 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
         maxY = Math.max(maxY, point.y);
       });
     });
+    
+    // Check text elements
+    if (textElements.length > 0) {
+      const tempCanvas = document.createElement('canvas');
+      const tempCtx = tempCanvas.getContext('2d');
+      
+      textElements.forEach(textEl => {
+        tempCtx.font = `${textEl.fontSize}px Arial`;
+        const metrics = tempCtx.measureText(textEl.text);
+        
+        minX = Math.min(minX, textEl.x);
+        minY = Math.min(minY, textEl.y - textEl.fontSize);
+        maxX = Math.max(maxX, textEl.x + metrics.width);
+        maxY = Math.max(maxY, textEl.y);
+      });
+    }
+    
+    // If no elements, return null
+    if (minX === Infinity) return null;
     
     const padding = 10;
     const width = Math.ceil(maxX - minX) + padding * 2;
@@ -74,6 +156,7 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
     cropCanvas.height = height;
     const cropCtx = cropCanvas.getContext('2d');
     
+    // Draw signature paths
     cropCtx.strokeStyle = signatureColor;
     cropCtx.lineWidth = 2;
     cropCtx.lineCap = 'round';
@@ -90,6 +173,17 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
       }
     });
     
+    // Draw text elements
+    textElements.forEach(textEl => {
+      cropCtx.fillStyle = textEl.color;
+      cropCtx.font = `${textEl.fontSize}px Arial`;
+      cropCtx.fillText(
+        textEl.text, 
+        textEl.x - minX + padding, 
+        textEl.y - minY + padding
+      );
+    });
+    
     return {
       dataUrl: cropCanvas.toDataURL('image/png'),
       width,
@@ -99,15 +193,53 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
 
   const handleMouseDown = (e) => {
     e.preventDefault();
-    setIsDrawing(true);
     const pos = getMousePos(e);
-    setSignaturePaths(prev => [...prev, [pos]]);
+    
+    if (mode === 'text') {
+      // Check if clicking on existing text element
+      const textElement = getTextElementAt(pos.x, pos.y);
+      if (textElement) {
+        setDraggedElement(textElement);
+        setDragOffset({
+          x: pos.x - textElement.x,
+          y: pos.y - textElement.y
+        });
+        setActiveTextElement(null);
+      } else {
+        // Create new text element
+        const newTextElement = {
+          id: Date.now(),
+          text: '',
+          x: pos.x,
+          y: pos.y,
+          fontSize: fontSize,
+          color: signatureColor
+        };
+        
+        setTextElements(prev => [...prev, newTextElement]);
+        setActiveTextElement(newTextElement);
+        setDraggedElement(null);
+      }
+    } else if (mode === 'draw') {
+      setActiveTextElement(null);
+      setIsDrawing(true);
+      setSignaturePaths(prev => [...prev, [pos]]);
+    }
   };
 
   const handleMouseMove = (e) => {
-    if (isDrawing) {
-      e.preventDefault();
-      const pos = getMousePos(e);
+    e.preventDefault();
+    const pos = getMousePos(e);
+    
+    if (draggedElement) {
+      // Update text element position
+      setTextElements(prev => prev.map(textEl => 
+        textEl.id === draggedElement.id 
+          ? { ...textEl, x: pos.x - dragOffset.x, y: pos.y - dragOffset.y }
+          : textEl
+      ));
+      setDraggedElement(prev => prev ? { ...prev, x: pos.x - dragOffset.x, y: pos.y - dragOffset.y } : null);
+    } else if (isDrawing && mode === 'draw') {
       setSignaturePaths(prev => {
         const newPaths = [...prev];
         if (newPaths.length > 0) {
@@ -121,10 +253,61 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
   const handleMouseUp = (e) => {
     e.preventDefault();
     setIsDrawing(false);
+    setDraggedElement(null);
   };
 
-  const clearSignature = () => {
+  const handleCanvasClick = (e) => {
+    // This is now handled in handleMouseDown
+  };
+
+  const handleKeyDown = (e) => {
+    if (activeTextElement) {
+      if (e.key === 'Backspace') {
+        e.preventDefault();
+        if (activeTextElement.text.length > 0) {
+          const updatedText = activeTextElement.text.slice(0, -1);
+          setTextElements(prev => prev.map(textEl => 
+            textEl.id === activeTextElement.id 
+              ? { ...textEl, text: updatedText }
+              : textEl
+          ));
+          setActiveTextElement(prev => ({ ...prev, text: updatedText }));
+        } else {
+          // Remove empty text element
+          setTextElements(prev => prev.filter(textEl => textEl.id !== activeTextElement.id));
+          setActiveTextElement(null);
+        }
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        setActiveTextElement(null);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setActiveTextElement(null);
+      } else if (e.key.length === 1) {
+        e.preventDefault();
+        const updatedText = activeTextElement.text + e.key;
+        setTextElements(prev => prev.map(textEl => 
+          textEl.id === activeTextElement.id 
+            ? { ...textEl, text: updatedText }
+            : textEl
+        ));
+        setActiveTextElement(prev => ({ ...prev, text: updatedText }));
+      }
+    }
+  };
+
+  // Add keyboard event listener
+  useEffect(() => {
+    if (show && activeTextElement) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [show, activeTextElement]);
+
+  const clearAll = () => {
     setSignaturePaths([]);
+    setTextElements([]);
+    setActiveTextElement(null);
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -148,6 +331,8 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
     
     onClose();
     setSignaturePaths([]);
+    setTextElements([]);
+    setActiveTextElement(null);
     
     // Clear the canvas
     const canvas = canvasRef.current;
@@ -161,9 +346,9 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4">
+      <div className="bg-white rounded-lg p-6 max-w-3xl w-full mx-4">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold">Draw Signature</h3>
+          <h3 className="text-lg font-semibold">Create Signature</h3>
           <button
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700"
@@ -173,40 +358,88 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
         </div>
         
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Color</label>
-            <input
-              type="color"
-              value={signatureColor}
-              onChange={(e) => setSignatureColor(e.target.value)}
-              className="border rounded h-8 w-20"
-            />
+          {/* Mode Selection */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setMode('draw')}
+              className={`px-4 py-2 rounded flex items-center gap-2 ${
+                mode === 'draw' 
+                  ? 'bg-blue-500 text-white' 
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              ✏️ Draw
+            </button>
+            <button
+              onClick={() => setMode('text')}
+              className={`px-4 py-2 rounded flex items-center gap-2 ${
+                mode === 'text' 
+                  ? 'bg-blue-500 text-white' 
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              <Type size={16} />
+              Text
+            </button>
+          </div>
+
+          {/* Controls */}
+          <div className="flex gap-4 items-end">
+            <div>
+              <label className="block text-sm font-medium mb-1">Color</label>
+              <input
+                type="color"
+                value={signatureColor}
+                onChange={(e) => setSignatureColor(e.target.value)}
+                className="border rounded h-8 w-20"
+              />
+            </div>
+            
+            {mode === 'text' && (
+              <div>
+                <label className="block text-sm font-medium mb-1">Font Size</label>
+                <input
+                  type="number"
+                  value={fontSize}
+                  onChange={(e) => setFontSize(parseInt(e.target.value) || 16)}
+                  min="8"
+                  max="72"
+                  className="border rounded px-3 py-1 w-20"
+                />
+              </div>
+            )}
           </div>
           
           <div className="border-2 border-dashed border-gray-300 rounded-lg p-2">
             <canvas
               ref={canvasRef}
-              width={600}
-              height={200}
+              width={700}
+              height={250}
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseUp}
-              className="w-full cursor-crosshair bg-white rounded border"
+              onClick={handleCanvasClick}
+              className={`w-full bg-white rounded border ${
+                mode === 'draw' ? 'cursor-crosshair' : 'cursor-pointer'
+              }`}
               style={{ touchAction: 'none' }}
             />
           </div>
           
           <p className="text-sm text-gray-600 text-center">
-            Draw your signature above
+            {mode === 'draw' 
+              ? 'Draw your signature above' 
+              : 'Enter text and click on the canvas to add it. Click and drag existing text to move it.'
+            }
           </p>
           
           <div className="flex gap-2 justify-end">
             <button
-              onClick={clearSignature}
+              onClick={clearAll}
               className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
             >
-              Clear
+              Clear All
             </button>
             <button
               onClick={onClose}
@@ -216,7 +449,7 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
             </button>
             <button
               onClick={handleSubmit}
-              disabled={signaturePaths.length === 0 || signaturePaths.every(path => path.length === 0)}
+              disabled={signaturePaths.length === 0 && textElements.length === 0}
               className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2"
             >
               <Check size={16} />

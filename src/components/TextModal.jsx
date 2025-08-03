@@ -1,159 +1,78 @@
-// components/SignatureModal.jsx
+// components/TextModal.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Check } from 'lucide-react';
 
-const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [signaturePaths, setSignaturePaths] = useState([]);
-  const [signatureColor, setSignatureColor] = useState('#000000');
+const TextModal = ({ show, onClose, onSubmit, clickPosition }) => {
+  const [textInput, setTextInput] = useState('');
+  const [fontSize, setFontSize] = useState(16);
+  const [textColor, setTextColor] = useState('#000000');
   
   const canvasRef = useRef(null);
 
   useEffect(() => {
-    if (show && signaturePaths.length > 0) {
-      drawSignatureOnCanvas();
+    if (show && textInput) {
+      createTextOnCanvas();
     }
-  }, [signaturePaths, signatureColor, show]);
+  }, [textInput, fontSize, textColor, show]);
 
-  const getMousePos = (e) => {
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
-    };
-  };
-
-  const drawSignatureOnCanvas = () => {
+  const createTextOnCanvas = () => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     
+    // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    if (signaturePaths.length > 0) {
-      ctx.strokeStyle = signatureColor;
-      ctx.lineWidth = 2;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
+    if (textInput.trim()) {
+      ctx.font = `${fontSize}px Arial`;
+      ctx.fillStyle = textColor;
+      ctx.textBaseline = 'top';
       
-      signaturePaths.forEach(path => {
-        if (path.length > 1) {
-          ctx.beginPath();
-          ctx.moveTo(path[0].x, path[0].y);
-          for (let i = 1; i < path.length; i++) {
-            ctx.lineTo(path[i].x, path[i].y);
-          }
-          ctx.stroke();
-        }
-      });
+      // Calculate text dimensions
+      const metrics = ctx.measureText(textInput);
+      const textWidth = metrics.width;
+      const textHeight = fontSize;
+      
+      // Resize canvas to fit text with padding
+      const padding = 10;
+      canvas.width = textWidth + padding * 2;
+      canvas.height = textHeight + padding * 2;
+      
+      // Redraw text (canvas resize clears it)
+      ctx.font = `${fontSize}px Arial`;
+      ctx.fillStyle = textColor;
+      ctx.textBaseline = 'top';
+      ctx.fillText(textInput, padding, padding);
     }
   };
 
-  const createSignaturePNG = () => {
-    if (signaturePaths.length === 0) return null;
-    
-    // Find bounds
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    
-    signaturePaths.forEach(path => {
-      path.forEach(point => {
-        minX = Math.min(minX, point.x);
-        minY = Math.min(minY, point.y);
-        maxX = Math.max(maxX, point.x);
-        maxY = Math.max(maxY, point.y);
-      });
-    });
-    
-    const padding = 10;
-    const width = Math.ceil(maxX - minX) + padding * 2;
-    const height = Math.ceil(maxY - minY) + padding * 2;
-    
-    // Create new canvas for cropped signature
-    const cropCanvas = document.createElement('canvas');
-    cropCanvas.width = width;
-    cropCanvas.height = height;
-    const cropCtx = cropCanvas.getContext('2d');
-    
-    cropCtx.strokeStyle = signatureColor;
-    cropCtx.lineWidth = 2;
-    cropCtx.lineCap = 'round';
-    cropCtx.lineJoin = 'round';
-    
-    signaturePaths.forEach(path => {
-      if (path.length > 1) {
-        cropCtx.beginPath();
-        cropCtx.moveTo(path[0].x - minX + padding, path[0].y - minY + padding);
-        for (let i = 1; i < path.length; i++) {
-          cropCtx.lineTo(path[i].x - minX + padding, path[i].y - minY + padding);
-        }
-        cropCtx.stroke();
-      }
-    });
-    
-    return {
-      dataUrl: cropCanvas.toDataURL('image/png'),
-      width,
-      height
-    };
-  };
-
-  const handleMouseDown = (e) => {
-    e.preventDefault();
-    setIsDrawing(true);
-    const pos = getMousePos(e);
-    setSignaturePaths(prev => [...prev, [pos]]);
-  };
-
-  const handleMouseMove = (e) => {
-    if (isDrawing) {
-      e.preventDefault();
-      const pos = getMousePos(e);
-      setSignaturePaths(prev => {
-        const newPaths = [...prev];
-        if (newPaths.length > 0) {
-          newPaths[newPaths.length - 1].push(pos);
-        }
-        return newPaths;
-      });
-    }
-  };
-
-  const handleMouseUp = (e) => {
-    e.preventDefault();
-    setIsDrawing(false);
-  };
-
-  const clearSignature = () => {
-    setSignaturePaths([]);
+  const createTextPNG = () => {
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/png');
   };
 
   const handleSubmit = () => {
-    const signatureData = createSignaturePNG();
-    if (signatureData) {
-      const newElement = {
-        id: Date.now(),
-        type: 'signature',
-        x: clickPosition.x - signatureData.width / 2,
-        y: clickPosition.y - signatureData.height / 2,
-        width: signatureData.width,
-        height: signatureData.height,
-        dataUrl: signatureData.dataUrl
-      };
+    if (textInput.trim()) {
+      createTextOnCanvas();
       
-      onSubmit(newElement);
-    }
-    
-    onClose();
-    setSignaturePaths([]);
-    
-    // Clear the canvas
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      setTimeout(() => {
+        const dataUrl = createTextPNG();
+        const canvas = canvasRef.current;
+        
+        const newElement = {
+          id: Date.now(),
+          type: 'text',
+          text: textInput,
+          x: clickPosition.x - canvas.width / 2,
+          y: clickPosition.y - canvas.height / 2,
+          width: canvas.width,
+          height: canvas.height,
+          dataUrl
+        };
+        
+        onSubmit(newElement);
+        onClose();
+        setTextInput('');
+      }, 100);
     }
   };
 
@@ -161,9 +80,9 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4">
+      <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold">Draw Signature</h3>
+          <h3 className="text-lg font-semibold">Add Text</h3>
           <button
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700"
@@ -174,40 +93,48 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
         
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Color</label>
-            <input
-              type="color"
-              value={signatureColor}
-              onChange={(e) => setSignatureColor(e.target.value)}
-              className="border rounded h-8 w-20"
+            <label className="block text-sm font-medium mb-1">Text</label>
+            <textarea
+              value={textInput}
+              onChange={(e) => setTextInput(e.target.value)}
+              className="w-full border rounded px-3 py-2 h-20 resize-none"
+              placeholder="Enter your text..."
+              autoFocus
             />
           </div>
           
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-2">
-            <canvas
-              ref={canvasRef}
-              width={600}
-              height={200}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseUp}
-              className="w-full cursor-crosshair bg-white rounded border"
-              style={{ touchAction: 'none' }}
-            />
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium mb-1">Font Size</label>
+              <input
+                type="number"
+                value={fontSize}
+                onChange={(e) => setFontSize(Number(e.target.value))}
+                className="w-full border rounded px-3 py-2"
+                min="8"
+                max="72"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="block text-sm font-medium mb-1">Color</label>
+              <input
+                type="color"
+                value={textColor}
+                onChange={(e) => setTextColor(e.target.value)}
+                className="w-full border rounded h-10"
+              />
+            </div>
           </div>
           
-          <p className="text-sm text-gray-600 text-center">
-            Draw your signature above
-          </p>
+          {/* Preview */}
+          {textInput && (
+            <div className="border rounded p-3 bg-gray-50">
+              <p className="text-sm font-medium mb-2">Preview:</p>
+              <canvas ref={canvasRef} className="border bg-white" />
+            </div>
+          )}
           
           <div className="flex gap-2 justify-end">
-            <button
-              onClick={clearSignature}
-              className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
-            >
-              Clear
-            </button>
             <button
               onClick={onClose}
               className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
@@ -216,11 +143,11 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
             </button>
             <button
               onClick={handleSubmit}
-              disabled={signaturePaths.length === 0 || signaturePaths.every(path => path.length === 0)}
+              disabled={!textInput.trim()}
               className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2"
             >
               <Check size={16} />
-              Add Signature
+              Add Text
             </button>
           </div>
         </div>
@@ -229,4 +156,4 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
   );
 };
 
-export default SignatureModal;
+export default TextModal;
