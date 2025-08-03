@@ -206,13 +206,32 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
       setSavedSignatures(loadSavedSignatures());
       setActiveSection(loadSavedSignatures().length > 0 ? 'saved' : 'create');
       document.body.style.overflow = 'hidden';
+      // Prevent zoom on iOS
+      document.addEventListener('touchmove', preventZoom, { passive: false });
+      document.addEventListener('gesturestart', preventZoom);
+      document.addEventListener('gesturechange', preventZoom);
+      document.addEventListener('gestureend', preventZoom);
     } else {
       document.body.style.overflow = 'unset';
+      document.removeEventListener('touchmove', preventZoom);
+      document.removeEventListener('gesturestart', preventZoom);
+      document.removeEventListener('gesturechange', preventZoom);
+      document.removeEventListener('gestureend', preventZoom);
     }
     return () => {
       document.body.style.overflow = 'unset';
+      document.removeEventListener('touchmove', preventZoom);
+      document.removeEventListener('gesturestart', preventZoom);
+      document.removeEventListener('gesturechange', preventZoom);
+      document.removeEventListener('gestureend', preventZoom);
     };
   }, [show]);
+
+  const preventZoom = (e) => {
+    if (e.touches && e.touches.length > 1) {
+      e.preventDefault();
+    }
+  };
 
   const clearAll = () => {
     setSignaturePaths([]);
@@ -287,8 +306,9 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
   const hasContent = signaturePaths.length > 0 || textElements.some((el) => el.text.length > 0);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-end sm:items-center justify-center z-50 backdrop-blur-sm">
-      <div className="bg-white w-full h-[100dvh] sm:h-auto sm:rounded-2xl shadow-2xl sm:max-w-4xl sm:mx-auto sm:max-h-[90vh] overflow-y-auto border-0 sm:border border-gray-200 flex flex-col">
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 backdrop-blur-sm">
+      {/* Mobile: Full screen */}
+      <div className="bg-white w-full h-full sm:h-auto sm:rounded-2xl shadow-2xl sm:max-w-4xl sm:mx-auto sm:max-h-[90vh] overflow-hidden border-0 sm:border border-gray-200 flex flex-col">
         <ModalHeader onClose={onClose} activeSection={activeSection} />
         <SectionTabs
           activeSection={activeSection}
