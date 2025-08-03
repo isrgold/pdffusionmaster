@@ -96,30 +96,29 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-200">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl mx-auto max-h-[90vh] overflow-y-auto border border-gray-200 sm:rounded-2xl sm:mx-0">
                 {/* Header */}
-                <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-t-2xl">
-                    <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-white bg-opacity-20 rounded-lg">
-                                <Sparkles size={24} />
-                            </div>
-                            <div>
-                                <h3 className="text-xl font-bold">Create Signature</h3>
-                                <p className="text-blue-100 text-sm">Design your perfect signature</p>
-                            </div>
+                <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 sm:p-6 rounded-t-2xl flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-white bg-opacity-20 rounded-lg">
+                            <Sparkles size={24} />
                         </div>
-                        <button 
-                            onClick={onClose} 
-                            className="p-2 hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors duration-200"
-                        >
-                            <X size={24} />
-                        </button>
+                        <div>
+                            <h3 className="text-lg sm:text-xl font-bold">Create Signature</h3>
+                            <p className="text-blue-100 text-xs sm:text-sm">Design your perfect signature</p>
+                        </div>
                     </div>
+                    <button
+                        onClick={onClose}
+                        className="p-2 hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors duration-200"
+                        aria-label="Close modal"
+                    >
+                        <X size={24} />
+                    </button>
                 </div>
 
                 {/* Content */}
-                <div className="p-6 space-y-6">
+                <div className="p-4 sm:p-6 space-y-6">
                     <SignatureToolbar
                         mode={mode}
                         setMode={setMode}
@@ -150,51 +149,51 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
 
                     {/* Success Message */}
                     {showSuccess && (
-                        <div className="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg transform animate-bounce">
+                        <div className="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg transform animate-bounce z-50">
                             ✅ Signature saved successfully!
                         </div>
                     )}
                 </div>
 
                 {/* Footer */}
-                <div className="sticky bottom-0 bg-gray-50 p-6 rounded-b-2xl border-t border-gray-200">
-                    <div className="flex flex-wrap gap-3 justify-between items-center">
-                        <button 
-                            onClick={clearAll} 
+                <div className="sticky bottom-0 bg-gray-50 p-4 sm:p-6 rounded-b-2xl border-t border-gray-200">
+                    <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center">
+                        <button
+                            onClick={clearAll}
                             disabled={!hasContent}
-                            className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex items-center gap-2 justify-center px-4 py-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <Eraser size={16} />
                             Clear All
                         </button>
-                        
-                        <div className="flex gap-3">
-                            <button 
+
+                        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                            <button
                                 onClick={onClose}
                                 className="px-6 py-2 text-gray-600 hover:bg-gray-200 rounded-lg transition-colors duration-200"
                             >
                                 Cancel
                             </button>
-                            <button 
+                            <button
                                 onClick={handleSavePNG}
                                 disabled={!hasContent}
-                                className="flex items-center gap-2 px-6 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105"
+                                className="flex items-center gap-2 justify-center px-6 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105"
                             >
                                 <Download size={16} />
                                 Download PNG
                             </button>
-                            <button 
+                            <button
                                 onClick={handleSaveToStorage}
                                 disabled={!hasContent}
-                                className="flex items-center gap-2 px-6 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105"
+                                className="flex items-center gap-2 justify-center px-6 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105"
                             >
                                 <Save size={16} />
                                 Save to Browser
                             </button>
-                            <button 
+                            <button
                                 onClick={handleSubmit}
                                 disabled={!hasContent}
-                                className="flex items-center gap-2 px-8 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 shadow-lg"
+                                className="flex items-center gap-2 justify-center px-8 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 shadow-lg"
                             >
                                 <Check size={16} />
                                 Add Signature
