@@ -4,7 +4,7 @@ import { Upload } from 'lucide-react';
 import Toolbar from './components/Toolbar';
 import PDFViewer from './components/PDFViewer';
 import TextModal from './components/TextModal';
-import SignatureModal from './components/SignatureModal';
+import SignatureModal from './components/SignatureModal/SignatureModal';
 import { loadPDFLibraries } from './utils/pdfUtils';
 import { downloadPDF } from './utils/downloadUtils';
 
