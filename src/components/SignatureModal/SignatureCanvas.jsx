@@ -18,7 +18,8 @@ const SignatureCanvas = ({
     textElements,
     setTextElements,
     signatureColor,
-    fontSize
+    fontSize,
+    strokeWidth,
 }) => {
     const [activeTextElement, setActiveTextElement] = useState(null);
     
@@ -34,7 +35,7 @@ const SignatureCanvas = ({
         distance,
         getLineWidth,
         drawQuadraticCurve
-    } = useCanvasDrawing(signatureColor);
+    } = useCanvasDrawing(signatureColor, strokeWidth);
 
     const {
         draggedElement,

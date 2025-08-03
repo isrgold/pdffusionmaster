@@ -1,7 +1,7 @@
 // hooks/useCanvasDrawing.js
 import { useState, useCallback } from 'react';
 
-export const useCanvasDrawing = (signatureColor) => {
+export const useCanvasDrawing = (signatureColor, width) => {
     const [isDrawing, setIsDrawing] = useState(false);
     const [currentPath, setCurrentPath] = useState([]);
     const [lastPoint, setLastPoint] = useState(null);
@@ -12,9 +12,9 @@ export const useCanvasDrawing = (signatureColor) => {
     };
 
     const getLineWidth = useCallback((velocity) => {
-        const minWidth = 0.5;
-        const maxWidth = 3;
-        const velocityFilterWeight = 0.7;
+        const minWidth = width / 4;
+        const maxWidth = minWidth + 2.5;
+        const velocityFilterWeight = 0.9;
         
         const filteredVelocity = velocityFilterWeight * velocity + (1 - velocityFilterWeight) * lastVelocity;
         setLastVelocity(filteredVelocity);
