@@ -19,7 +19,16 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
     useEffect(() => {
         if (show) {
             setSavedSignatures(loadSavedSignatures());
+            // Prevent body scroll on mobile when modal is open
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = 'unset';
         }
+        
+        // Cleanup on unmount
+        return () => {
+            document.body.style.overflow = 'unset';
+        };
     }, [show]);
 
     const clearAll = () => {
@@ -95,69 +104,119 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
     const hasContent = signaturePaths.length > 0 || textElements.some(el => el.text.length > 0);
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl mx-auto max-h-[90vh] overflow-y-auto border border-gray-200 sm:rounded-2xl sm:mx-0">
-                {/* Header */}
-                <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 sm:p-6 rounded-t-2xl flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-white bg-opacity-20 rounded-lg">
-                            <Sparkles size={24} />
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-end sm:items-center justify-center z-50 backdrop-blur-sm">
+            {/* Mobile: slide up from bottom, Desktop: centered */}
+            <div className="bg-white w-full h-full sm:h-auto sm:rounded-2xl shadow-2xl sm:max-w-4xl sm:mx-auto sm:max-h-[90vh] overflow-y-auto border-0 sm:border border-gray-200 flex flex-col">
+                {/* Header - Fixed on mobile */}
+                <div className="flex-shrink-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-3 sm:p-6 sm:rounded-t-2xl">
+                    <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                            <div className="p-1.5 sm:p-2 bg-white bg-opacity-20 rounded-lg">
+                                <Sparkles size={20} className="sm:w-6 sm:h-6" />
+                            </div>
+                            <div>
+                                <h3 className="text-base sm:text-xl font-bold">Create Signature</h3>
+                                <p className="text-blue-100 text-xs sm:text-sm hidden sm:block">Design your perfect signature</p>
+                            </div>
                         </div>
-                        <div>
-                            <h3 className="text-lg sm:text-xl font-bold">Create Signature</h3>
-                            <p className="text-blue-100 text-xs sm:text-sm">Design your perfect signature</p>
+                        <button
+                            onClick={onClose}
+                            className="p-1.5 sm:p-2 hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors duration-200"
+                            aria-label="Close modal"
+                        >
+                            <X size={20} className="sm:w-6 sm:h-6" />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Content - Scrollable */}
+                <div className="flex-1 overflow-y-auto">
+                    <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
+                        <SignatureToolbar
+                            mode={mode}
+                            setMode={setMode}
+                            signatureColor={signatureColor}
+                            setSignatureColor={setSignatureColor}
+                            fontSize={fontSize}
+                            setFontSize={setFontSize}
+                        />
+
+                        <SignatureCanvas
+                            mode={mode}
+                            canvasRef={canvasRef}
+                            signaturePaths={signaturePaths}
+                            setSignaturePaths={setSignaturePaths}
+                            textElements={textElements}
+                            setTextElements={setTextElements}
+                            signatureColor={signatureColor}
+                            fontSize={fontSize}
+                        />
+
+                        {savedSignatures.length > 0 && (
+                            <SavedSignatures
+                                savedSignatures={savedSignatures}
+                                onInsert={handleInsertSavedSignature}
+                                onDelete={handleDeleteSavedSignature}
+                            />
+                        )}
+                    </div>
+                </div>
+
+                {/* Footer - Fixed on mobile */}
+                <div className="flex-shrink-0 bg-gray-50 p-3 sm:p-6 sm:rounded-b-2xl border-t border-gray-200">
+                    {/* Mobile: Stack all buttons vertically */}
+                    <div className="flex flex-col space-y-3 sm:hidden">
+                        {/* Primary action first on mobile */}
+                        <button
+                            onClick={handleSubmit}
+                            disabled={!hasContent}
+                            className="flex items-center gap-2 justify-center px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg font-medium"
+                        >
+                            <Check size={18} />
+                            Add Signature
+                        </button>
+                        
+                        {/* Secondary actions */}
+                        <div className="grid grid-cols-2 gap-3">
+                            <button
+                                onClick={handleSavePNG}
+                                disabled={!hasContent}
+                                className="flex items-center gap-2 justify-center px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                            >
+                                <Download size={16} />
+                                Download
+                            </button>
+                            <button
+                                onClick={handleSaveToStorage}
+                                disabled={!hasContent}
+                                className="flex items-center gap-2 justify-center px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                            >
+                                <Save size={16} />
+                                Save
+                            </button>
+                        </div>
+                        
+                        {/* Utility actions */}
+                        <div className="grid grid-cols-2 gap-3">
+                            <button
+                                onClick={clearAll}
+                                disabled={!hasContent}
+                                className="flex items-center gap-2 justify-center px-4 py-2.5 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed border border-gray-300"
+                            >
+                                <Eraser size={16} />
+                                Clear
+                            </button>
+                            <button
+                                onClick={onClose}
+                                className="px-4 py-2.5 text-gray-600 hover:bg-gray-200 rounded-lg transition-colors duration-200 border border-gray-300"
+                            >
+                                Cancel
+                            </button>
                         </div>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="p-2 hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors duration-200"
-                        aria-label="Close modal"
-                    >
-                        <X size={24} />
-                    </button>
-                </div>
 
-                {/* Content */}
-                <div className="p-4 sm:p-6 space-y-6">
-                    <SignatureToolbar
-                        mode={mode}
-                        setMode={setMode}
-                        signatureColor={signatureColor}
-                        setSignatureColor={setSignatureColor}
-                        fontSize={fontSize}
-                        setFontSize={setFontSize}
-                    />
-
-                    <SignatureCanvas
-                        mode={mode}
-                        canvasRef={canvasRef}
-                        signaturePaths={signaturePaths}
-                        setSignaturePaths={setSignaturePaths}
-                        textElements={textElements}
-                        setTextElements={setTextElements}
-                        signatureColor={signatureColor}
-                        fontSize={fontSize}
-                    />
-
-                    {savedSignatures.length > 0 && (
-                        <SavedSignatures
-                            savedSignatures={savedSignatures}
-                            onInsert={handleInsertSavedSignature}
-                            onDelete={handleDeleteSavedSignature}
-                        />
-                    )}
-
-                    {/* Success Message */}
-                    {showSuccess && (
-                        <div className="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg transform animate-bounce z-50">
-                            ✅ Signature saved successfully!
-                        </div>
-                    )}
-                </div>
-
-                {/* Footer */}
-                <div className="sticky bottom-0 bg-gray-50 p-4 sm:p-6 rounded-b-2xl border-t border-gray-200">
-                    <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center">
+                    {/* Desktop: Original horizontal layout */}
+                    <div className="hidden sm:flex justify-between items-center">
                         <button
                             onClick={clearAll}
                             disabled={!hasContent}
@@ -167,7 +226,7 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
                             Clear All
                         </button>
 
-                        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                        <div className="flex gap-3">
                             <button
                                 onClick={onClose}
                                 className="px-6 py-2 text-gray-600 hover:bg-gray-200 rounded-lg transition-colors duration-200"
@@ -201,6 +260,13 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
                         </div>
                     </div>
                 </div>
+
+                {/* Success Message - Adjusted for mobile */}
+                {showSuccess && (
+                    <div className="fixed top-4 left-4 right-4 sm:top-4 sm:right-4 sm:left-auto bg-green-500 text-white px-4 sm:px-6 py-3 rounded-lg shadow-lg transform animate-bounce z-50 text-center sm:text-left">
+                        ✅ Signature saved successfully!
+                    </div>
+                )}
             </div>
         </div>
     );
