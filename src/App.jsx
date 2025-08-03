@@ -1,6 +1,6 @@
 import React from 'react';
 import PDFMerger from './components/pdf';
-import SignaturePdfTool from "./components/PDFEditor";
+import SignaturePdfTool from "./PDFEditor";
 
 
 function App() {
