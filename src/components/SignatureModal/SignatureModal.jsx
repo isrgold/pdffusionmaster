@@ -1,6 +1,6 @@
 // components/SignatureModal/SignatureModal.jsx
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Check, Type } from 'lucide-react';
+import { X, Check, Download, Save, Eraser, Sparkles } from 'lucide-react';
 import SignatureCanvas from './SignatureCanvas';
 import SignatureToolbar from './SignatureToolbar';
 import SavedSignatures from './SavedSignatures';
@@ -10,9 +10,10 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
     const [signaturePaths, setSignaturePaths] = useState([]);
     const [textElements, setTextElements] = useState([]);
     const [signatureColor, setSignatureColor] = useState('#000000');
-    const [fontSize, setFontSize] = useState(16);
+    const [fontSize, setFontSize] = useState(18);
     const [mode, setMode] = useState('draw');
     const [savedSignatures, setSavedSignatures] = useState([]);
+    const [showSuccess, setShowSuccess] = useState(false);
     const canvasRef = useRef(null);
 
     useEffect(() => {
@@ -29,6 +30,11 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
         ctx?.clearRect(0, 0, canvas.width, canvas.height);
     };
 
+    const showSuccessMessage = () => {
+        setShowSuccess(true);
+        setTimeout(() => setShowSuccess(false), 2000);
+    };
+
     const handleSavePNG = () => {
         const signatureData = createSignaturePNG(signaturePaths, textElements, signatureColor);
         if (!signatureData) return;
@@ -36,6 +42,7 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
         link.href = signatureData.dataUrl;
         link.download = 'signature.png';
         link.click();
+        showSuccessMessage();
     };
 
     const handleSaveToStorage = () => {
@@ -43,7 +50,13 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
         if (!signatureData) return;
         const key = `signature_${Date.now()}`;
         localStorage.setItem(key, JSON.stringify(signatureData));
-        alert('Signature saved to browser storage.');
+        setSavedSignatures(loadSavedSignatures());
+        showSuccessMessage();
+    };
+
+    const handleDeleteSavedSignature = (key) => {
+        localStorage.removeItem(key);
+        setSavedSignatures(loadSavedSignatures());
     };
 
     const handleInsertSavedSignature = (sig) => {
@@ -79,49 +92,115 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
 
     if (!show) return null;
 
+    const hasContent = signaturePaths.length > 0 || textElements.some(el => el.text.length > 0);
+
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-3xl w-full mx-4">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold">Create Signature</h3>
-                    <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-                        <X size={20} />
-                    </button>
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-200">
+                {/* Header */}
+                <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-t-2xl">
+                    <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-white bg-opacity-20 rounded-lg">
+                                <Sparkles size={24} />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-bold">Create Signature</h3>
+                                <p className="text-blue-100 text-sm">Design your perfect signature</p>
+                            </div>
+                        </div>
+                        <button 
+                            onClick={onClose} 
+                            className="p-2 hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors duration-200"
+                        >
+                            <X size={24} />
+                        </button>
+                    </div>
                 </div>
 
-                <SignatureToolbar
-                    mode={mode}
-                    setMode={setMode}
-                    signatureColor={signatureColor}
-                    setSignatureColor={setSignatureColor}
-                    fontSize={fontSize}
-                    setFontSize={setFontSize}
-                />
-
-                <SignatureCanvas
-                    mode={mode}
-                    canvasRef={canvasRef}
-                    signaturePaths={signaturePaths}
-                    setSignaturePaths={setSignaturePaths}
-                    textElements={textElements}
-                    setTextElements={setTextElements}
-                    signatureColor={signatureColor}
-                    fontSize={fontSize}
-                />
-
-                {savedSignatures.length > 0 && (
-                    <SavedSignatures
-                        savedSignatures={savedSignatures}
-                        onInsert={handleInsertSavedSignature}
+                {/* Content */}
+                <div className="p-6 space-y-6">
+                    <SignatureToolbar
+                        mode={mode}
+                        setMode={setMode}
+                        signatureColor={signatureColor}
+                        setSignatureColor={setSignatureColor}
+                        fontSize={fontSize}
+                        setFontSize={setFontSize}
                     />
-                )}
 
-                <div className="flex gap-2 justify-end mt-4">
-                    <button onClick={clearAll} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded">Clear All</button>
-                    <button onClick={onClose} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded">Cancel</button>
-                    <button onClick={handleSavePNG} className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">Save PNG</button>
-                    <button onClick={handleSaveToStorage} className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600">Save to Browser</button>
-                    <button onClick={handleSubmit} className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center gap-2"><Check size={16} />Add Signature</button>
+                    <SignatureCanvas
+                        mode={mode}
+                        canvasRef={canvasRef}
+                        signaturePaths={signaturePaths}
+                        setSignaturePaths={setSignaturePaths}
+                        textElements={textElements}
+                        setTextElements={setTextElements}
+                        signatureColor={signatureColor}
+                        fontSize={fontSize}
+                    />
+
+                    {savedSignatures.length > 0 && (
+                        <SavedSignatures
+                            savedSignatures={savedSignatures}
+                            onInsert={handleInsertSavedSignature}
+                            onDelete={handleDeleteSavedSignature}
+                        />
+                    )}
+
+                    {/* Success Message */}
+                    {showSuccess && (
+                        <div className="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg transform animate-bounce">
+                            ✅ Signature saved successfully!
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer */}
+                <div className="sticky bottom-0 bg-gray-50 p-6 rounded-b-2xl border-t border-gray-200">
+                    <div className="flex flex-wrap gap-3 justify-between items-center">
+                        <button 
+                            onClick={clearAll} 
+                            disabled={!hasContent}
+                            className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <Eraser size={16} />
+                            Clear All
+                        </button>
+                        
+                        <div className="flex gap-3">
+                            <button 
+                                onClick={onClose}
+                                className="px-6 py-2 text-gray-600 hover:bg-gray-200 rounded-lg transition-colors duration-200"
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                onClick={handleSavePNG}
+                                disabled={!hasContent}
+                                className="flex items-center gap-2 px-6 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105"
+                            >
+                                <Download size={16} />
+                                Download PNG
+                            </button>
+                            <button 
+                                onClick={handleSaveToStorage}
+                                disabled={!hasContent}
+                                className="flex items-center gap-2 px-6 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105"
+                            >
+                                <Save size={16} />
+                                Save to Browser
+                            </button>
+                            <button 
+                                onClick={handleSubmit}
+                                disabled={!hasContent}
+                                className="flex items-center gap-2 px-8 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 shadow-lg"
+                            >
+                                <Check size={16} />
+                                Add Signature
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

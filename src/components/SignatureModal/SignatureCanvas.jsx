@@ -1,3 +1,4 @@
+// components/SignatureModal/SignatureCanvas.jsx
 import React, { useEffect, useState } from 'react';
 
 const SignatureCanvas = ({
@@ -18,9 +19,12 @@ const SignatureCanvas = ({
     const getMousePos = (e) => {
         const canvas = canvasRef.current;
         const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        
         return {
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top
+            x: (e.clientX - rect.left) * scaleX,
+            y: (e.clientY - rect.top) * scaleY
         };
     };
 
@@ -74,20 +78,21 @@ const SignatureCanvas = ({
             const isActive = (draggedElement && draggedElement.id === el.id) || (activeTextElement && activeTextElement.id === el.id);
             if (isActive) {
                 const metrics = ctx.measureText(el.text);
-                ctx.strokeStyle = '#007bff';
-                ctx.lineWidth = 1;
-                ctx.setLineDash([5, 5]);
+                ctx.strokeStyle = '#3b82f6';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([8, 4]);
                 ctx.strokeRect(
-                    el.x - 2,
-                    el.y - el.fontSize - 2,
-                    metrics.width + 4,
-                    el.fontSize + 4
+                    el.x - 4,
+                    el.y - el.fontSize - 4,
+                    metrics.width + 8,
+                    el.fontSize + 8
                 );
                 ctx.setLineDash([]);
 
                 if (activeTextElement && activeTextElement.id === el.id) {
                     const cursorX = el.x + metrics.width;
-                    ctx.strokeStyle = '#000';
+                    ctx.strokeStyle = '#3b82f6';
+                    ctx.lineWidth = 2;
                     ctx.beginPath();
                     ctx.moveTo(cursorX, el.y - el.fontSize);
                     ctx.lineTo(cursorX, el.y);
@@ -209,25 +214,33 @@ const SignatureCanvas = ({
     }, [activeTextElement]);
 
     return (
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-2">
-            <canvas
-                ref={canvasRef}
-                width={700}
-                height={250}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-                className={`w-full bg-white rounded border ${mode === 'draw' ? 'cursor-crosshair' : 'cursor-pointer'}`}
-                style={{ touchAction: 'none' }}
-            />
-            <p className="text-sm text-gray-600 text-center mt-2">
-                {mode === 'draw'
-                    ? 'Draw your signature above'
-                    : 'Enter text and click on the canvas to add it. Click and drag existing text to move it.'}
-            </p>
+        <div className="relative">
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border-2 border-dashed border-blue-300 p-4 shadow-inner">
+                <canvas
+                    ref={canvasRef}
+                    width={700}
+                    height={280}
+                    onMouseDown={handleMouseDown}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                    onMouseLeave={handleMouseUp}
+                    className={`w-full bg-white rounded-lg border-2 border-gray-200 shadow-sm ${
+                        mode === 'draw' ? 'cursor-crosshair' : 'cursor-pointer'
+                    } hover:border-blue-400 transition-colors duration-200`}
+                    style={{ touchAction: 'none' }}
+                />
+                <div className="flex items-center justify-center mt-3">
+                    <p className="text-sm text-gray-600 bg-white px-4 py-2 rounded-full shadow-sm border border-gray-200">
+                        {mode === 'draw'
+                            ? '✏️ Draw your signature above'
+                            : '📝 Click to add text • Drag to move existing text'}
+                    </p>
+                </div>
+            </div>
         </div>
     );
 };
 
 export default SignatureCanvas;
+
+
