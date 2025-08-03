@@ -117,12 +117,14 @@ const PDFEditor = () => {
 
   const handleElementRelease = () => {
     setIsDragging(false);
-    setSelectedElement(null);
+    // setSelectedElement(null);
   };
 
   const addElement = (element) => {
     setElements(prev => [...prev, { ...element, page: currentPage }]);
   };
+
+  
 
   const deleteSelectedElement = () => {
     if (selectedElement) {
