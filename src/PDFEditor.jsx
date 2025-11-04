@@ -14,7 +14,8 @@ const PDFEditor = () => {
   const [pdfData, setPdfData] = useState(null);
   const [pdfPages, setPdfPages] = useState([]);
   const [currentPage, setCurrentPage] = useState(0);
-  
+  let lastPassword = null;
+
   // Tool and interaction states
   const [tool, setTool] = useState('move');
   const [elements, setElements] = useState([]);
@@ -22,12 +23,12 @@ const PDFEditor = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isDownloading, setIsDownloading] = useState(false);
-  
+
   // Modal states
   const [showTextModal, setShowTextModal] = useState(false);
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [clickPosition, setClickPosition] = useState({ x: 0, y: 0 });
-  
+
   // Refs
   const fileInputRef = useRef(null);
   const pdfDocRef = useRef(null);
@@ -48,7 +49,7 @@ const PDFEditor = () => {
         setShowSignatureModal(false);
       }
     };
-    
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedElement]);
@@ -59,25 +60,94 @@ const PDFEditor = () => {
       setPdfFile(file);
       setElements([]);
       setCurrentPage(0);
-      
+
       // Read file as array buffer
       const arrayBuffer = await file.arrayBuffer();
-      
-      // Store as Uint8Array immediately to prevent detachment
       const pdfBytes = new Uint8Array(arrayBuffer);
-      setPdfData(pdfBytes);
-      
-      // Use a copy for PDF.js to avoid conflicts
-      const pdfJsBuffer = pdfBytes.buffer.slice(0);
-      const pdf = await window.pdfjsLib.getDocument(pdfJsBuffer).promise;
-      pdfDocRef.current = pdf;
-      
-      const pages = [];
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        pages.push(page);
+
+      try {
+        const loadingTask = window.pdfjsLib.getDocument({
+          data: pdfBytes.slice(0)
+        });
+
+        let needsDecryption = false;
+
+        // Handle password-protected PDFs
+        loadingTask.onPassword = (updatePassword, reason) => {
+          needsDecryption = true;
+          const message = reason === 1
+            ? 'הקובץ מוגן בסיסמה. אנא הזן את הסיסמה:'
+            : 'סיסמה שגויה. נסה שוב:';
+
+          const password = prompt(message);
+          if (password === null) {
+            throw new Error('Password required');
+          }
+          updatePassword(password);
+        };
+
+        const pdf = await loadingTask.promise;
+        pdfDocRef.current = pdf;
+
+        const pages = [];
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          pages.push(page);
+        }
+        setPdfPages(pages);
+
+        // If the PDF was encrypted, create a new unencrypted version
+        if (needsDecryption) {
+          const newPdf = await PDFLib.PDFDocument.create();
+
+          // Render each page and add to new PDF
+          for (let i = 0; i < pages.length; i++) {
+            const page = pages[i];
+            const viewport = page.getViewport({ scale: 2.0 });
+
+            const canvas = document.createElement('canvas');
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            const context = canvas.getContext('2d');
+
+            await page.render({
+              canvasContext: context,
+              viewport: viewport
+            }).promise;
+
+            // Convert canvas to image
+            const imgData = canvas.toDataURL('image/png');
+            const imgBytes = await fetch(imgData).then(r => r.arrayBuffer());
+            const image = await newPdf.embedPng(imgBytes);
+
+            // Add page with image
+            const pdfPage = newPdf.addPage([viewport.width, viewport.height]);
+            pdfPage.drawImage(image, {
+              x: 0,
+              y: 0,
+              width: viewport.width,
+              height: viewport.height,
+            });
+          }
+
+          // Save the new unencrypted PDF
+          const decryptedBytes = await newPdf.save();
+          setPdfData(new Uint8Array(decryptedBytes));
+        } else {
+          // Not encrypted, use original
+          setPdfData(pdfBytes);
+        }
+
+      } catch (error) {
+        if (error.message === 'Password required') {
+          alert('לא ניתן לפתוח את הקובץ ללא סיסמה');
+        } else {
+          console.error('Error loading PDF:', error);
+          alert('שגיאה בטעינת הקובץ');
+        }
+        setPdfFile(null);
+        setPdfData(null);
       }
-      setPdfPages(pages);
     }
   };
 
@@ -106,9 +176,9 @@ const PDFEditor = () => {
     if (isDragging && selectedElement && tool === 'move') {
       const newX = pos.x - dragOffset.x;
       const newY = pos.y - dragOffset.y;
-      
-      setElements(prev => prev.map(el => 
-        el.id === selectedElement.id 
+
+      setElements(prev => prev.map(el =>
+        el.id === selectedElement.id
           ? { ...el, x: newX, y: newY }
           : el
       ));
@@ -124,7 +194,7 @@ const PDFEditor = () => {
     setElements(prev => [...prev, { ...element, page: currentPage }]);
   };
 
-  
+
 
   const deleteSelectedElement = () => {
     if (selectedElement) {
@@ -151,7 +221,7 @@ const PDFEditor = () => {
     <div className="min-h-screen bg-gray-100 p-4">
       <div className="max-w-6xl mx-auto">
         <h1 className="text-3xl font-bold text-center mb-8 text-gray-800">PDF Editor</h1>
-        
+
         {!pdfFile ? (
           <div className="bg-white rounded-lg shadow-lg p-8 text-center">
             <Upload className="mx-auto mb-4 text-gray-400" size={64} />
