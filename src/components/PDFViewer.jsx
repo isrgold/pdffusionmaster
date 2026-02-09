@@ -9,10 +9,14 @@ const PDFViewer = ({
   onToolClick,
   onElementSelect,
   onElementMove,
+  onElementResize,
   onElementRelease
 }) => {
   const canvasRef = useRef(null);
   const renderTaskRef = useRef(null);
+
+  // Resize state
+  const [resizeState, setResizeState] = React.useState(null); // { handle: string, startX: number, startY: number, startWidth: number, startHeight: number, startLeft: number, startTop: number }
 
   useEffect(() => {
     if (page) {
