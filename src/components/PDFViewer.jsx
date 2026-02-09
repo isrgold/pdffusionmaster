@@ -2,9 +2,7 @@
 import React, { useRef, useEffect } from 'react';
 
 const PDFViewer = ({
-  pdfPages,
-  currentPage,
-  setCurrentPage,
+  page,
   elements,
   selectedElement,
   tool,
@@ -17,33 +15,35 @@ const PDFViewer = ({
   const renderTaskRef = useRef(null);
 
   useEffect(() => {
-    if (pdfPages.length > 0) {
-      renderPage(currentPage);
+    if (page) {
+      renderPage();
     }
-  }, [currentPage, pdfPages]);
+  }, [page]); // Re-render when page object changes
 
-  const renderPage = async (pageNum) => {
-    if (pdfPages.length === 0) return;
-    
+  const renderPage = async () => {
+    if (!page || !page.pdfPage) return;
+
     if (renderTaskRef.current) {
       renderTaskRef.current.cancel();
     }
-    
+
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    const page = pdfPages[pageNum];
-    
-    const viewport = page.getViewport({ scale: 1.5 });
+    const pdfPage = page.pdfPage;
+
+    // Use rotation from page object if available (not fully implemented in edit yet, but ready)
+    const viewport = pdfPage.getViewport({ scale: 1.5, rotation: page.rotation || 0 });
+
     canvas.height = viewport.height;
     canvas.width = viewport.width;
-    
+
     const renderContext = {
       canvasContext: ctx,
       viewport: viewport
     };
-    
+
     try {
-      renderTaskRef.current = page.render(renderContext);
+      renderTaskRef.current = pdfPage.render(renderContext);
       await renderTaskRef.current.promise;
       renderTaskRef.current = null;
     } catch (error) {
@@ -64,17 +64,17 @@ const PDFViewer = ({
 
   const getElementAt = (pos) => {
     return elements
-      .filter(el => el.page === currentPage)
-      .reverse()
+      .slice() // Copy to avoid mutating
+      .reverse() // Check top-most elements first
       .find(el => {
         return pos.x >= el.x && pos.x <= el.x + el.width &&
-               pos.y >= el.y && pos.y <= el.y + el.height;
+          pos.y >= el.y && pos.y <= el.y + el.height;
       });
   };
 
   const handleCanvasMouseDown = (e) => {
     const pos = getMousePos(e);
-    
+
     if (tool === 'text' || tool === 'signature') {
       onToolClick(pos);
     } else if (tool === 'move') {
@@ -99,33 +99,8 @@ const PDFViewer = ({
     }
   };
 
-  const currentPageElements = elements.filter(el => el.page === currentPage);
-
   return (
     <div className="bg-white rounded-lg shadow-lg p-4">
-      {/* Page Navigation */}
-      {pdfPages.length > 1 && (
-        <div className="flex items-center justify-center gap-4 mb-4">
-          <button
-            onClick={() => setCurrentPage(Math.max(0, currentPage - 1))}
-            disabled={currentPage === 0}
-            className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
-          >
-            Previous
-          </button>
-          <span className="font-medium">
-            Page {currentPage + 1} of {pdfPages.length}
-          </span>
-          <button
-            onClick={() => setCurrentPage(Math.min(pdfPages.length - 1, currentPage + 1))}
-            disabled={currentPage === pdfPages.length - 1}
-            className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
-          >
-            Next
-          </button>
-        </div>
-      )}
-      
       {/* Canvas Container */}
       <div className="border-2 border-gray-200 rounded-lg overflow-auto relative">
         <canvas
@@ -137,16 +112,15 @@ const PDFViewer = ({
           className="block relative"
           style={{ cursor: getCursorStyle() }}
         />
-        
+
         {/* Elements Overlay */}
-        {currentPageElements.map(element => (
+        {elements.map(element => (
           <img
             key={element.id}
             src={element.dataUrl}
             alt={element.type}
-            className={`absolute pointer-events-none select-none ${
-              selectedElement?.id === element.id ? 'ring-2 ring-blue-500' : ''
-            }`}
+            className={`absolute pointer-events-none select-none ${selectedElement?.id === element.id ? 'ring-2 ring-blue-500' : ''
+              }`}
             style={{
               left: `${(element.x / canvasRef.current?.width) * 100}%`,
               top: `${(element.y / canvasRef.current?.height) * 100}%`,
@@ -156,7 +130,7 @@ const PDFViewer = ({
           />
         ))}
       </div>
-      
+
       {/* Instructions */}
       <div className="mt-4 text-sm text-gray-600">
         <p className="font-medium mb-2">Instructions:</p>

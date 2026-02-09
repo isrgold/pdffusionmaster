@@ -1,24 +1,28 @@
+
 // PDFEditor.jsx - Main component
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload } from 'lucide-react';
+import { DndContext, closestCenter } from '@dnd-kit/core';
+import { arrayMove, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import Toolbar from './components/Toolbar';
 import PDFViewer from './components/PDFViewer';
+import PageManager from './components/PageManager';
 import TextModal from './components/TextModal';
 import SignatureModal from './components/SignatureModal/SignatureModal';
-import { loadPDFLibraries } from './utils/pdfUtils';
+import { PDFDocument } from 'pdf-lib';
+import { loadPDFLibraries, renderPageThumbnail, pdfjsLib } from './utils/pdfUtils';
 import { downloadPDF } from './utils/downloadUtils';
 
 const PDFEditor = () => {
-  // File and PDF states
-  const [pdfFile, setPdfFile] = useState(null);
-  const [pdfData, setPdfData] = useState(null);
-  const [pdfPages, setPdfPages] = useState([]);
-  const [currentPage, setCurrentPage] = useState(0);
-  let lastPassword = null;
+  // Documents state: { [docId]: { data: Uint8Array, fileName: string } }
+  const [documents, setDocuments] = useState({});
+  // Pages state: Array of { id: string, pdfPage: Proxy, originalDocId: string, pageIndex: number, rotation: 0 }
+  const [pages, setPages] = useState([]);
+  const [currentPageId, setCurrentPageId] = useState(null);
 
-  // Tool and interaction states
+  // Interaction states
   const [tool, setTool] = useState('move');
-  const [elements, setElements] = useState([]);
+  const [elements, setElements] = useState([]); // elements now use pageId instead of page index
   const [selectedElement, setSelectedElement] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -31,9 +35,9 @@ const PDFEditor = () => {
 
   // Refs
   const fileInputRef = useRef(null);
-  const pdfDocRef = useRef(null);
+  // We no longer need a single pdfDocRef as we manage multiple docs
 
-  // Load PDF.js and PDF-lib on component mount
+  // Load PDF.js and PDF-lib
   useEffect(() => {
     loadPDFLibraries();
   }, []);
@@ -54,99 +58,62 @@ const PDFEditor = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedElement]);
 
-  const handleFileUpload = async (event) => {
-    const file = event.target.files[0];
-    if (file && file.type === 'application/pdf') {
-      setPdfFile(file);
-      setElements([]);
-      setCurrentPage(0);
+  const generateId = () => Math.random().toString(36).substr(2, 9);
 
-      // Read file as array buffer
+  const handleFileUpload = async (event) => {
+    const files = Array.from(event.target.files);
+    if (!files.length) return;
+
+    for (const file of files) {
+      if (file.type !== 'application/pdf') continue;
+
       const arrayBuffer = await file.arrayBuffer();
       const pdfBytes = new Uint8Array(arrayBuffer);
+      const docId = generateId();
 
       try {
-        const loadingTask = window.pdfjsLib.getDocument({
+        const loadingTask = pdfjsLib.getDocument({
           data: pdfBytes.slice(0)
         });
 
-        let needsDecryption = false;
-
-        // Handle password-protected PDFs
         loadingTask.onPassword = (updatePassword, reason) => {
-          needsDecryption = true;
-          const message = reason === 1
-            ? 'הקובץ מוגן בסיסמה. אנא הזן את הסיסמה:'
-            : 'סיסמה שגויה. נסה שוב:';
-
-          const password = prompt(message);
-          if (password === null) {
-            throw new Error('Password required');
-          }
-          updatePassword(password);
+          const password = prompt(reason === 1 ? 'Enter password:' : 'Wrong password, try again:');
+          if (password) updatePassword(password);
         };
 
         const pdf = await loadingTask.promise;
-        pdfDocRef.current = pdf;
+        const newPages = [];
 
-        const pages = [];
         for (let i = 1; i <= pdf.numPages; i++) {
           const page = await pdf.getPage(i);
-          pages.push(page);
+          const thumbnail = await renderPageThumbnail(page);
+          newPages.push({
+            id: generateId(),
+            pdfPage: page,
+            originalDocId: docId,
+            pageIndex: i - 1,
+            rotation: 0,
+            fileName: file.name,
+            thumbnail
+          });
         }
-        setPdfPages(pages);
 
-        // If the PDF was encrypted, create a new unencrypted version
-        if (needsDecryption) {
-          const newPdf = await PDFLib.PDFDocument.create();
+        setDocuments(prev => ({
+          ...prev,
+          [docId]: { data: pdfBytes, fileName: file.name }
+        }));
 
-          // Render each page and add to new PDF
-          for (let i = 0; i < pages.length; i++) {
-            const page = pages[i];
-            const viewport = page.getViewport({ scale: 2.0 });
-
-            const canvas = document.createElement('canvas');
-            canvas.width = viewport.width;
-            canvas.height = viewport.height;
-            const context = canvas.getContext('2d');
-
-            await page.render({
-              canvasContext: context,
-              viewport: viewport
-            }).promise;
-
-            // Convert canvas to image
-            const imgData = canvas.toDataURL('image/png');
-            const imgBytes = await fetch(imgData).then(r => r.arrayBuffer());
-            const image = await newPdf.embedPng(imgBytes);
-
-            // Add page with image
-            const pdfPage = newPdf.addPage([viewport.width, viewport.height]);
-            pdfPage.drawImage(image, {
-              x: 0,
-              y: 0,
-              width: viewport.width,
-              height: viewport.height,
-            });
+        setPages(prev => {
+          const updated = [...prev, ...newPages];
+          if (!currentPageId && updated.length > 0) {
+            setCurrentPageId(updated[0].id);
           }
-
-          // Save the new unencrypted PDF
-          const decryptedBytes = await newPdf.save();
-          setPdfData(new Uint8Array(decryptedBytes));
-        } else {
-          // Not encrypted, use original
-          setPdfData(pdfBytes);
-        }
+          return updated;
+        });
 
       } catch (error) {
-        if (error.message === 'Password required') {
-          alert('לא ניתן לפתוח את הקובץ ללא סיסמה');
-        } else {
-          console.error('Error loading PDF:', error);
-          alert('שגיאה בטעינת הקובץ');
-        }
-        setPdfFile(null);
-        setPdfData(null);
+        console.error('Error loading PDF:', error);
+        alert(`Error loading ${file.name}`);
       }
     }
   };
@@ -187,14 +154,12 @@ const PDFEditor = () => {
 
   const handleElementRelease = () => {
     setIsDragging(false);
-    // setSelectedElement(null);
   };
 
   const addElement = (element) => {
-    setElements(prev => [...prev, { ...element, page: currentPage }]);
+    if (!currentPageId) return;
+    setElements(prev => [...prev, { ...element, pageId: currentPageId }]);
   };
-
-
 
   const deleteSelectedElement = () => {
     if (selectedElement) {
@@ -204,86 +169,114 @@ const PDFEditor = () => {
   };
 
   const clearPageElements = () => {
-    setElements(prev => prev.filter(el => el.page !== currentPage));
+    if (!currentPageId) return;
+    setElements(prev => prev.filter(el => el.pageId !== currentPageId));
   };
 
   const handleDownloadPDF = async () => {
     await downloadPDF({
-      pdfData,
-      pdfDocRef: pdfDocRef.current,
+      documents,
+      pages,
       elements,
-      fileName: pdfFile.name,
       setIsDownloading
     });
   };
 
+  // Page Management Handlers
+  const handlePageSelect = (index) => {
+    if (pages[index]) setCurrentPageId(pages[index].id);
+  };
+
+  const getCurrentPageIndex = () => {
+    return pages.findIndex(p => p.id === currentPageId);
+  };
+
+  const currentPageObj = pages.find(p => p.id === currentPageId);
+
   return (
-    <div className="min-h-screen bg-gray-100 p-4">
-      <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold text-center mb-8 text-gray-800">PDF Editor</h1>
-
-        {!pdfFile ? (
-          <div className="bg-white rounded-lg shadow-lg p-8 text-center">
-            <Upload className="mx-auto mb-4 text-gray-400" size={64} />
-            <h2 className="text-xl font-semibold mb-4">Upload a PDF to get started</h2>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-medium transition-colors"
-            >
-              Choose PDF File
-            </button>
-          </div>
-        ) : (
-          <div className="flex gap-6">
-            <Toolbar
-              tool={tool}
-              setTool={setTool}
-              selectedElement={selectedElement}
-              deleteSelectedElement={deleteSelectedElement}
-              clearPageElements={clearPageElements}
-              downloadPDF={handleDownloadPDF}
-              hasElements={elements.length > 0}
-              isDownloading={isDownloading}
-            />
-
-            <div className="flex-1">
-              <PDFViewer
-                pdfPages={pdfPages}
-                currentPage={currentPage}
-                setCurrentPage={setCurrentPage}
-                elements={elements}
-                selectedElement={selectedElement}
-                tool={tool}
-                onToolClick={handleToolClick}
-                onElementSelect={handleElementSelect}
-                onElementMove={handleElementMove}
-                onElementRelease={handleElementRelease}
-              />
-            </div>
-          </div>
-        )}
-
-        <TextModal
-          show={showTextModal}
-          onClose={() => setShowTextModal(false)}
-          onSubmit={addElement}
-          clickPosition={clickPosition}
+    <div className="flex h-screen bg-gray-100 overflow-hidden">
+      {/* Sidebar - Page Manager */}
+      <div className="w-80 h-full border-r bg-white shadow-lg z-10">
+        <PageManager
+          pages={pages}
+          setPages={setPages}
+          selectedPageIndex={getCurrentPageIndex()}
+          onSelectPage={handlePageSelect}
+          onAddFiles={() => fileInputRef.current?.click()}
         />
-
-        <SignatureModal
-          show={showSignatureModal}
-          onClose={() => setShowSignatureModal(false)}
-          onSubmit={addElement}
-          clickPosition={clickPosition}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf"
+          multiple
+          onChange={handleFileUpload}
+          className="hidden"
         />
       </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <div className="p-4 bg-white shadow-sm z-[5]">
+          <h1 className="text-xl font-bold text-gray-800 text-center">PDF Editor</h1>
+        </div>
+
+        <div className="flex-1 overflow-auto p-8 flex justify-center">
+          {!pages.length ? (
+            <div className="flex flex-col items-center justify-center p-12 bg-white rounded-lg shadow h-fit my-auto">
+              <Upload className="text-gray-400 mb-4" size={64} />
+              <h2 className="text-xl font-semibold mb-4">Upload PDFs to get started</h2>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+              >
+                Choose PDF Files
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-4 w-full max-w-4xl">
+              <Toolbar
+                tool={tool}
+                setTool={setTool}
+                selectedElement={selectedElement}
+                deleteSelectedElement={deleteSelectedElement}
+                clearPageElements={clearPageElements}
+                downloadPDF={handleDownloadPDF}
+                hasElements={elements.length > 0 || pages.length > 0}
+                isDownloading={isDownloading}
+              />
+
+              <div className="w-full bg-white shadow-lg rounded-lg p-1 min-h-[600px] flex justify-center items-start">
+                {currentPageObj && (
+                  <PDFViewer
+                    page={currentPageObj}
+                    elements={elements.filter(e => e.pageId === currentPageId)}
+                    selectedElement={selectedElement}
+                    tool={tool}
+                    onToolClick={handleToolClick}
+                    onElementSelect={handleElementSelect}
+                    onElementMove={handleElementMove}
+                    onElementRelease={handleElementRelease}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <TextModal
+        show={showTextModal}
+        onClose={() => setShowTextModal(false)}
+        onSubmit={addElement}
+        clickPosition={clickPosition}
+      />
+
+      <SignatureModal
+        show={showSignatureModal}
+        onClose={() => setShowSignatureModal(false)}
+        onSubmit={addElement}
+        clickPosition={clickPosition}
+      />
     </div>
   );
 };
