@@ -1,4 +1,4 @@
-import { PDFDocument, degrees } from 'pdf-lib';
+// utils/downloadUtils.js
 
 export const downloadPDF = async ({
   documents,
@@ -14,6 +14,7 @@ export const downloadPDF = async ({
   setIsDownloading(true);
 
   try {
+    const { PDFDocument, degrees } = await import('pdf-lib');
 
 
     // Create a new PDF document

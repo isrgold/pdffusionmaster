@@ -9,8 +9,7 @@ import PDFViewer from './components/PDFViewer';
 import PageManager from './components/PageManager';
 import TextModal from './components/TextModal';
 import SignatureModal from './components/SignatureModal/SignatureModal';
-import { PDFDocument } from 'pdf-lib';
-import { loadPDFLibraries, renderPageThumbnail, pdfjsLib } from './utils/pdfUtils';
+import { loadPDFLibraries, renderPageThumbnail, getPdfJs } from './utils/pdfUtils';
 import { downloadPDF } from './utils/downloadUtils';
 
 const PDFEditor = () => {
@@ -27,6 +26,7 @@ const PDFEditor = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isDownloading, setIsDownloading] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
 
   // Modal states
   const [showTextModal, setShowTextModal] = useState(false);
@@ -72,6 +72,7 @@ const PDFEditor = () => {
       const docId = generateId();
 
       try {
+        const pdfjsLib = await getPdfJs();
         const loadingTask = pdfjsLib.getDocument({
           data: pdfBytes.slice(0)
         });
@@ -107,6 +108,7 @@ const PDFEditor = () => {
           const updated = [...prev, ...newPages];
           if (!currentPageId && updated.length > 0) {
             setCurrentPageId(updated[0].id);
+            setShowSidebar(true);
           }
           return updated;
         });
@@ -152,13 +154,26 @@ const PDFEditor = () => {
     }
   };
 
+  const handleElementResize = (id, newBounds) => {
+    setElements(prev => prev.map(el =>
+      el.id === id
+        ? { ...el, ...newBounds }
+        : el
+    ));
+  };
+
   const handleElementRelease = () => {
     setIsDragging(false);
   };
 
   const addElement = (element) => {
     if (!currentPageId) return;
-    setElements(prev => [...prev, { ...element, pageId: currentPageId }]);
+    const newElement = { ...element, pageId: currentPageId };
+    setElements(prev => [...prev, newElement]);
+
+    // Auto-switch to move tool and select the new element
+    setTool('move');
+    setSelectedElement(newElement);
   };
 
   const deleteSelectedElement = () => {
@@ -194,46 +209,51 @@ const PDFEditor = () => {
   const currentPageObj = pages.find(p => p.id === currentPageId);
 
   return (
-    <div className="flex h-screen bg-gray-100 overflow-hidden">
-      {/* Sidebar - Page Manager */}
-      <div className="w-80 h-full border-r bg-white shadow-lg z-10">
-        <PageManager
-          pages={pages}
-          setPages={setPages}
-          selectedPageIndex={getCurrentPageIndex()}
-          onSelectPage={handlePageSelect}
-          onAddFiles={() => fileInputRef.current?.click()}
-        />
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".pdf"
-          multiple
-          onChange={handleFileUpload}
-          className="hidden"
-        />
-      </div>
+    <div className="flex h-screen bg-gray-100 overflow-hidden relative">
+      {/* Sidebar - Page Manager (Floating) */}
+      {pages.length > 0 && showSidebar && (
+        <div className="absolute left-0 top-0 h-full w-80 bg-white/95 backdrop-blur shadow-2xl z-50 transition-transform duration-300 ease-in-out border-r border-gray-200">
+          <PageManager
+            pages={pages}
+            setPages={setPages}
+            selectedPageIndex={getCurrentPageIndex()}
+            onSelectPage={handlePageSelect}
+            onAddFiles={() => fileInputRef.current?.click()}
+            onClose={() => setShowSidebar(false)}
+          />
+        </div>
+      )}
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf"
+        multiple
+        onChange={handleFileUpload}
+        className="hidden"
+      />
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
-        <div className="p-4 bg-white shadow-sm z-[5]">
-          <h1 className="text-xl font-bold text-gray-800 text-center">PDF Editor</h1>
-        </div>
 
-        <div className="flex-1 overflow-auto p-8 flex justify-center">
+
+        <div className="flex-1 overflow-auto p-8 relative flex justify-center bg-gray-50/50">
           {!pages.length ? (
-            <div className="flex flex-col items-center justify-center p-12 bg-white rounded-lg shadow h-fit my-auto">
-              <Upload className="text-gray-400 mb-4" size={64} />
-              <h2 className="text-xl font-semibold mb-4">Upload PDFs to get started</h2>
+            <div className="flex flex-col items-center justify-center p-12 bg-white rounded-2xl shadow-sm border border-dashed border-gray-300 h-fit my-auto max-w-md text-center">
+              <div className="bg-blue-50 p-4 rounded-full mb-6">
+                <Upload className="text-blue-500" size={40} />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">Upload PDF</h2>
+              <p className="text-gray-500 mb-8">Upload a PDF file to start editing, signing, and rearranging pages.</p>
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-semibold shadow-lg shadow-blue-200 transition-all hover:scale-[1.02] active:scale-[0.98]"
               >
                 Choose PDF Files
               </button>
             </div>
           ) : (
-            <div className="flex flex-col items-center gap-4 w-full max-w-4xl">
+            <>
               <Toolbar
                 tool={tool}
                 setTool={setTool}
@@ -243,23 +263,28 @@ const PDFEditor = () => {
                 downloadPDF={handleDownloadPDF}
                 hasElements={elements.length > 0 || pages.length > 0}
                 isDownloading={isDownloading}
+                showSidebar={showSidebar}
+                setShowSidebar={setShowSidebar}
               />
 
-              <div className="w-full bg-white shadow-lg rounded-lg p-1 min-h-[600px] flex justify-center items-start">
-                {currentPageObj && (
-                  <PDFViewer
-                    page={currentPageObj}
-                    elements={elements.filter(e => e.pageId === currentPageId)}
-                    selectedElement={selectedElement}
-                    tool={tool}
-                    onToolClick={handleToolClick}
-                    onElementSelect={handleElementSelect}
-                    onElementMove={handleElementMove}
-                    onElementRelease={handleElementRelease}
-                  />
-                )}
+              <div className="mt-20 w-fit max-w-full">
+                <div className="bg-white shadow-2xl shadow-gray-200/50 rounded-lg p-1 min-h-[600px] flex justify-center items-start border border-gray-100">
+                  {currentPageObj && (
+                    <PDFViewer
+                      page={currentPageObj}
+                      elements={elements.filter(e => e.pageId === currentPageId)}
+                      selectedElement={selectedElement}
+                      tool={tool}
+                      onToolClick={handleToolClick}
+                      onElementSelect={handleElementSelect}
+                      onElementMove={handleElementMove}
+                      onElementResize={handleElementResize}
+                      onElementRelease={handleElementRelease}
+                    />
+                  )}
+                </div>
               </div>
-            </div>
+            </>
           )}
         </div>
       </div>
