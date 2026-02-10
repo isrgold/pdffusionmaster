@@ -6,7 +6,7 @@ const TextModal = ({ show, onClose, onSubmit, clickPosition }) => {
   const [textInput, setTextInput] = useState('');
   const [fontSize, setFontSize] = useState(16);
   const [textColor, setTextColor] = useState('#000000');
-  
+
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -18,25 +18,25 @@ const TextModal = ({ show, onClose, onSubmit, clickPosition }) => {
   const createTextOnCanvas = () => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    
+
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
+
     if (textInput.trim()) {
       ctx.font = `${fontSize}px Arial`;
       ctx.fillStyle = textColor;
       ctx.textBaseline = 'top';
-      
+
       // Calculate text dimensions
       const metrics = ctx.measureText(textInput);
       const textWidth = metrics.width;
       const textHeight = fontSize;
-      
+
       // Resize canvas to fit text with padding
       const padding = 10;
       canvas.width = textWidth + padding * 2;
       canvas.height = textHeight + padding * 2;
-      
+
       // Redraw text (canvas resize clears it)
       ctx.font = `${fontSize}px Arial`;
       ctx.fillStyle = textColor;
@@ -52,27 +52,47 @@ const TextModal = ({ show, onClose, onSubmit, clickPosition }) => {
 
   const handleSubmit = () => {
     if (textInput.trim()) {
-      createTextOnCanvas();
-      
-      setTimeout(() => {
-        const dataUrl = createTextPNG();
-        const canvas = canvasRef.current;
-        
-        const newElement = {
-          id: Date.now(),
-          type: 'text',
-          text: textInput,
-          x: clickPosition.x - canvas.width / 2,
-          y: clickPosition.y - canvas.height / 2,
-          width: canvas.width,
-          height: canvas.height,
-          dataUrl
-        };
-        
-        onSubmit(newElement);
-        onClose();
-        setTextInput('');
-      }, 100);
+      // Use a temporary DOM element to measure exact rendered size
+      // This accounts for wrapping (if we allowed it), multi-line (newlines), and specific font rendering
+      const tempSpan = document.createElement('div');
+      tempSpan.style.position = 'absolute';
+      tempSpan.style.visibility = 'hidden';
+      tempSpan.style.whiteSpace = 'pre-wrap';
+      tempSpan.style.fontFamily = 'Inter, system-ui, sans-serif'; // Match the app's font
+      tempSpan.style.fontSize = `${fontSize}px`;
+      tempSpan.style.lineHeight = '1.2'; // Explicit line height
+      tempSpan.style.width = 'auto';
+      tempSpan.style.height = 'auto';
+      tempSpan.innerText = textInput;
+
+      document.body.appendChild(tempSpan);
+      const rect = tempSpan.getBoundingClientRect();
+      document.body.removeChild(tempSpan);
+
+      const padding = 10;
+      // Add a little extra buffer to prevent slight browser rendering differences from causing wrap
+      const finalWidth = Math.ceil(rect.width) + (padding * 2) + 2;
+      const finalHeight = Math.ceil(rect.height) + (padding * 2);
+
+      const canvas = canvasRef.current;
+      const newElement = {
+        id: Date.now(),
+        type: 'text',
+        text: textInput,
+        fontSize: fontSize,
+        color: textColor,
+        x: clickPosition.x - finalWidth / 2,
+        y: clickPosition.y - finalHeight / 2,
+        width: finalWidth,
+        height: finalHeight,
+        baseWidth: finalWidth, // Store base dimensions for scaling
+        baseHeight: finalHeight,
+        baseFontSize: fontSize
+      };
+
+      onSubmit(newElement);
+      onClose();
+      setTextInput('');
     }
   };
 
@@ -90,7 +110,7 @@ const TextModal = ({ show, onClose, onSubmit, clickPosition }) => {
             <X size={20} />
           </button>
         </div>
-        
+
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Text</label>
@@ -102,7 +122,7 @@ const TextModal = ({ show, onClose, onSubmit, clickPosition }) => {
               autoFocus
             />
           </div>
-          
+
           <div className="flex gap-4">
             <div className="flex-1">
               <label className="block text-sm font-medium mb-1">Font Size</label>
@@ -125,7 +145,7 @@ const TextModal = ({ show, onClose, onSubmit, clickPosition }) => {
               />
             </div>
           </div>
-          
+
           {/* Preview */}
           {textInput && (
             <div className="border rounded p-3 bg-gray-50">
@@ -133,7 +153,7 @@ const TextModal = ({ show, onClose, onSubmit, clickPosition }) => {
               <canvas ref={canvasRef} className="border bg-white" />
             </div>
           )}
-          
+
           <div className="flex gap-2 justify-end">
             <button
               onClick={onClose}

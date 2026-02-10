@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 
-export const useCanvasRenderer = (canvasRef, signaturePaths, textElements, signatureColor, draggedElement, activeTextElement, currentPath, drawQuadraticCurve) => {
+export const useCanvasRenderer = (canvasRef, signaturePaths, textElements, signatureColor, draggedElement, activeTextElement, currentPath, drawQuadraticCurve, backgroundImage) => {
     return useCallback(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -8,7 +8,33 @@ export const useCanvasRenderer = (canvasRef, signaturePaths, textElements, signa
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-                // Draw text elements
+        // Draw background image if exists
+        if (backgroundImage) {
+            const imgAspectRatio = backgroundImage.width / backgroundImage.height;
+            const canvasAspectRatio = canvas.width / canvas.height;
+
+            let renderWidth, renderHeight, offsetX, offsetY;
+
+            if (imgAspectRatio > canvasAspectRatio) {
+                // Image is wider than canvas
+                renderWidth = canvas.width;
+                renderHeight = canvas.width / imgAspectRatio;
+                offsetX = 0;
+                offsetY = (canvas.height - renderHeight) / 2;
+            } else {
+                // Image is taller than canvas
+                renderHeight = canvas.height;
+                renderWidth = canvas.height * imgAspectRatio;
+                offsetX = (canvas.width - renderWidth) / 2;
+                offsetY = 0;
+            }
+
+            ctx.globalAlpha = 0.5; // Slight transparency for background
+            ctx.drawImage(backgroundImage, offsetX, offsetY, renderWidth, renderHeight);
+            ctx.globalAlpha = 1.0;
+        }
+
+        // Draw text elements
         textElements.forEach(el => {
             ctx.fillStyle = el.color;
             ctx.font = `${el.fontSize}px Arial`;
@@ -63,5 +89,5 @@ export const useCanvasRenderer = (canvasRef, signaturePaths, textElements, signa
                 drawQuadraticCurve(ctx, currentPath);
             }
         }
-    }, [signaturePaths, textElements, signatureColor, draggedElement, activeTextElement, currentPath, drawQuadraticCurve, canvasRef]);
+    }, [signaturePaths, textElements, signatureColor, draggedElement, activeTextElement, currentPath, drawQuadraticCurve, canvasRef, backgroundImage]);
 };

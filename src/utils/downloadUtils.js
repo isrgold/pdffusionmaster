@@ -56,41 +56,85 @@ export const downloadPDF = async ({
         // However, pdf-lib handles rotation on the page object itself mostly.
         // Let's rely on standard scaling:
 
+        // Fetch Hebrew-supporting font (Rubik) if we have any text elements
+        const hasText = pageElements.some(el => el.type === 'text');
+        let customFont = null;
+
+        if (hasText) {
+          try {
+            // Using a CDN for Rubik (Google Fonts)
+            const fontBytes = await fetch('https://cdn.jsdelivr.net/npm/@fontsource/rubik/files/rubik-latin-400-normal.woff').then(res => res.arrayBuffer())
+              .catch(async () => {
+                // Fallback to standard Helvetica if fetch fails (won't support Hebrew well)
+                return null;
+              });
+
+            if (fontBytes) {
+              customFont = await mergedPdf.embedFont(fontBytes);
+            } else {
+              customFont = await mergedPdf.embedFont(await mergedPdf.embedStandardFont('Helvetica'));
+            }
+          } catch (e) {
+            console.warn("Could not load custom font, falling back", e);
+            customFont = await mergedPdf.embedFont(await mergedPdf.embedStandardFont('Helvetica'));
+          }
+        }
+
         const scaleFactor = 1 / 1.5;
 
         for (const element of pageElements) {
           try {
-            // Convert data URL to bytes
-            const base64Data = element.dataUrl.split(',')[1];
-            const binaryString = atob(base64Data);
-            const imageBytes = new Uint8Array(binaryString.length);
-            for (let i = 0; i < binaryString.length; i++) {
-              imageBytes[i] = binaryString.charCodeAt(i);
-            }
-
-            const image = await mergedPdf.embedPng(imageBytes);
-
-            // Calculate position constraints
-            // PDF coordinates: (0,0) is bottom-left. Canvas: (0,0) is top-left.
-            // We need to flip Y.
-
-            // Element x/y are relative to the canvas (which is 1.5x scaled)
+            // Calculate PDF coordinates
             const pdfX = element.x * scaleFactor;
-
-            // For Y: The visual top in PDF is at y = height.
-            // The element.y is distance from top of canvas.
-            // So y distance from bottom of PDF page = pageHeight - (element.y * scaleFactor) - (elementHeight * scale)
             const pdfY = pageHeight - (element.y * scaleFactor) - (element.height * scaleFactor);
-
             const pdfWidth = element.width * scaleFactor;
             const pdfHeight = element.height * scaleFactor;
 
-            newPage.drawImage(image, {
-              x: pdfX,
-              y: pdfY,
-              width: pdfWidth,
-              height: pdfHeight
-            });
+            if (element.type === 'text') {
+              // Draw Text
+              const { text, color, baseFontSize, baseHeight } = element;
+
+              // Calculate font size scaling
+              // The font size in the PDF should be proportional to the visual scaling
+              const scaleY = element.height / baseHeight;
+              const scaledFontSize = baseFontSize * scaleY * scaleFactor;
+
+              // Parse color hex to RGB
+              const r = parseInt(color.slice(1, 3), 16) / 255;
+              const g = parseInt(color.slice(3, 5), 16) / 255;
+              const b = parseInt(color.slice(5, 7), 16) / 255;
+
+              // Adjust position for text baseline/padding
+              // The visual padding was 10px. 
+              const paddingOffset = 10 * scaleFactor * scaleY;
+
+              newPage.drawText(text, {
+                x: pdfX + paddingOffset,
+                y: pdfY + pdfHeight - (scaledFontSize) - paddingOffset, // Approximate baseline
+                size: scaledFontSize,
+                font: customFont,
+                color: { type: 'RGB', r, g, b },
+                maxWidth: pdfWidth - (paddingOffset * 2) // Basic wrapping
+              });
+
+            } else {
+              // Draw Image (Signature)
+              const base64Data = element.dataUrl.split(',')[1];
+              const binaryString = atob(base64Data);
+              const imageBytes = new Uint8Array(binaryString.length);
+              for (let i = 0; i < binaryString.length; i++) {
+                imageBytes[i] = binaryString.charCodeAt(i);
+              }
+
+              const image = await mergedPdf.embedPng(imageBytes);
+
+              newPage.drawImage(image, {
+                x: pdfX,
+                y: pdfY,
+                width: pdfWidth,
+                height: pdfHeight
+              });
+            }
           } catch (err) {
             console.error(`Error adding element to page ${page.id}:`, err);
           }

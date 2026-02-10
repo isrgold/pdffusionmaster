@@ -80,25 +80,39 @@ const PDFViewer = ({
   const getResizeHandleAt = (pos, element) => {
     if (!element || !canvasRef.current) return null;
 
-    const handleSize = 16; // Corresponds to w-4 h-4 (16px)
-    const halfHandleSize = handleSize / 2;
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+
+    // Calculate scale factors (canvas pixels per screen pixel)
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
+    // Visual handle size is 16px (w-4 h-4)
+    // We use a slightly larger hit area (24px) for better usability
+    const screenHandleSize = 24;
+
+    // Convert screen size to canvas units
+    const handleWidth = screenHandleSize * scaleX;
+    const handleHeight = screenHandleSize * scaleY;
 
     const elementX = element.x;
     const elementY = element.y;
     const elementWidth = element.width;
     const elementHeight = element.height;
 
+    // Define center points for each handle in canvas coordinates
     const handles = {
-      nw: { x: elementX - halfHandleSize, y: elementY - halfHandleSize },
-      ne: { x: elementX + elementWidth - halfHandleSize, y: elementY - halfHandleSize },
-      sw: { x: elementX - halfHandleSize, y: elementY + elementHeight - halfHandleSize },
-      se: { x: elementX + elementWidth - halfHandleSize, y: elementY + elementHeight - halfHandleSize },
+      nw: { x: elementX, y: elementY },
+      ne: { x: elementX + elementWidth, y: elementY },
+      sw: { x: elementX, y: elementY + elementHeight },
+      se: { x: elementX + elementWidth, y: elementY + elementHeight },
     };
 
     for (const handle in handles) {
       const h = handles[handle];
-      if (pos.x >= h.x && pos.x <= h.x + handleSize &&
-        pos.y >= h.y && pos.y <= h.y + handleSize) {
+      // Check if pos is within handle bounds centered at h.x, h.y
+      if (pos.x >= h.x - handleWidth / 2 && pos.x <= h.x + handleWidth / 2 &&
+        pos.y >= h.y - handleHeight / 2 && pos.y <= h.y + handleHeight / 2) {
         return handle;
       }
     }
@@ -240,29 +254,56 @@ const PDFViewer = ({
               top: `${(element.y / canvasRef.current?.height) * 100}%`,
               width: `${(element.width / canvasRef.current?.width) * 100}%`,
               height: `${(element.height / canvasRef.current?.height) * 100}%`,
-              pointerEvents: 'none'
+              pointerEvents: 'none' // Allow click-through to parent for selection logic, handled via overlay/parent
             }}
           >
-            {/* Selection Border */}
-            <div className={`w-full h-full ${selectedElement?.id === element.id ? 'ring-2 ring-blue-500 ring-offset-2 border border-blue-300 border-dashed' : ''}`}>
-              <img
-                src={element.dataUrl}
-                alt={element.type}
-                className="w-full h-full object-contain"
-              />
+            {/* Element Container */}
+            <div className={`w-full h-full relative ${selectedElement?.id === element.id ? 'ring-2 ring-blue-500 ring-offset-2 border border-blue-300 border-dashed' : ''}`}>
+
+              {element.type === 'text' ? (
+                <div
+                  style={{
+                    // Structure: we render the text at its *original* captured size (baseWidth/baseHeight)
+                    // and then simple scale it to fit the current element bounds.
+                    // This ensures it behaves exactly like an image/vector object during resize.
+                    width: `${element.baseWidth}px`,
+                    height: `${element.baseHeight}px`,
+                    transform: `scale(${element.width / element.baseWidth}, ${element.height / element.baseHeight})`,
+                    transformOrigin: 'top left',
+                    fontSize: `${element.baseFontSize}px`,
+                    fontFamily: 'Inter, system-ui, sans-serif',
+                    lineHeight: '1.2',
+                    color: element.color,
+                    padding: '10px',
+                    whiteSpace: 'pre-wrap',
+                    display: 'flex',
+                    alignItems: 'flex-start', // Top aligned usually
+                    justifyContent: 'flex-start',
+                  }}
+                  className="leading-tight font-sans"
+                >
+                  {element.text}
+                </div>
+              ) : (
+                <img
+                  src={element.dataUrl}
+                  alt={element.type}
+                  className="w-full h-full object-contain"
+                />
+              )}
             </div>
 
             {/* Resize Handles (Only for selected) */}
             {selectedElement?.id === element.id && (
               <>
                 {/* NW */}
-                <div className="absolute -top-2 -left-2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md z-30" style={{ pointerEvents: 'auto' }} />
+                <div className="absolute -top-2 -left-2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md z-30 cursor-nw-resize" style={{ pointerEvents: 'auto' }} />
                 {/* NE */}
-                <div className="absolute -top-2 -right-2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md z-30" style={{ pointerEvents: 'auto' }} />
+                <div className="absolute -top-2 -right-2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md z-30 cursor-ne-resize" style={{ pointerEvents: 'auto' }} />
                 {/* SW */}
-                <div className="absolute -bottom-2 -left-2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md z-30" style={{ pointerEvents: 'auto' }} />
+                <div className="absolute -bottom-2 -left-2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md z-30 cursor-sw-resize" style={{ pointerEvents: 'auto' }} />
                 {/* SE */}
-                <div className="absolute -bottom-2 -right-2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md z-30" style={{ pointerEvents: 'auto' }} />
+                <div className="absolute -bottom-2 -right-2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md z-30 cursor-se-resize" style={{ pointerEvents: 'auto' }} />
               </>
             )}
           </div>

@@ -38,8 +38,8 @@ const SectionTabs = ({ activeSection, setActiveSection, savedSignatures }) => (
             <button
                 onClick={() => setActiveSection('saved')}
                 className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 sm:px-4 sm:py-3 text-xs sm:text-sm font-medium transition-colors duration-200 ${activeSection === 'saved'
-                        ? 'bg-white text-blue-600 border-b-2 border-blue-600'
-                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                    ? 'bg-white text-blue-600 border-b-2 border-blue-600'
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
                     }`}
             >
                 <FileSignature size={14} className="sm:w-4 sm:h-4" />
@@ -53,8 +53,8 @@ const SectionTabs = ({ activeSection, setActiveSection, savedSignatures }) => (
             <button
                 onClick={() => setActiveSection('create')}
                 className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 sm:px-4 sm:py-3 text-xs sm:text-sm font-medium transition-colors duration-200 ${activeSection === 'create'
-                        ? 'bg-white text-blue-600 border-b-2 border-blue-600'
-                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                    ? 'bg-white text-blue-600 border-b-2 border-blue-600'
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
                     }`}
             >
                 <Plus size={14} className="sm:w-4 sm:h-4" />
@@ -200,10 +200,15 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
     const [activeSection, setActiveSection] = useState('saved');
     const canvasRef = useRef(null);
 
+    const [backgroundImage, setBackgroundImage] = useState(null);
+
     useEffect(() => {
         if (show) {
             setSavedSignatures(loadSavedSignatures());
-            setActiveSection(loadSavedSignatures().length > 0 ? 'saved' : 'create');
+            // Don't override activeSection if we are in "edit" mode (handled by onEdit)
+            if (activeSection === 'saved' && loadSavedSignatures().length === 0) {
+                setActiveSection('create');
+            }
             document.body.style.overflow = 'hidden';
             // Prevent zoom on iOS
             document.addEventListener('touchmove', preventZoom, { passive: false });
@@ -235,6 +240,7 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
     const clearAll = () => {
         setSignaturePaths([]);
         setTextElements([]);
+        setBackgroundImage(null);
         const canvas = canvasRef.current;
         const ctx = canvas?.getContext('2d');
         ctx?.clearRect(0, 0, canvas.width, canvas.height);
@@ -246,7 +252,7 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
     };
 
     const handleSavePNG = () => {
-        const signatureData = createSignaturePNG(signaturePaths, textElements, signatureColor);
+        const signatureData = createSignaturePNG(signaturePaths, textElements, signatureColor, backgroundImage);
         if (!signatureData) return;
         const link = document.createElement('a');
         link.href = signatureData.dataUrl;
@@ -256,10 +262,23 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
     };
 
     const handleSaveToStorage = () => {
-        const signatureData = createSignaturePNG(signaturePaths, textElements, signatureColor);
+        const signatureData = createSignaturePNG(signaturePaths, textElements, signatureColor, backgroundImage);
         if (!signatureData) return;
         const key = `signature_${Date.now()}`;
-        localStorage.setItem(key, JSON.stringify(signatureData));
+
+        // Save full state for re-editing
+        const fullState = {
+            dataUrl: signatureData.dataUrl, // The preview image
+            width: signatureData.width,
+            height: signatureData.height,
+            paths: signaturePaths,
+            text: textElements,
+            bg: backgroundImage ? backgroundImage.src : null, // Save BG source
+            color: signatureColor,
+            name: 'Saved Signature'
+        };
+
+        localStorage.setItem(key, JSON.stringify(fullState));
         setSavedSignatures(loadSavedSignatures());
         showSuccessMessage();
     };
@@ -283,8 +302,29 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
         onClose();
     };
 
+    const handleEditSavedSignature = (sig) => {
+        setSignaturePaths(sig.paths || []);
+        setTextElements(sig.text || []);
+        setSignatureColor(sig.color || '#000000');
+
+        if (sig.bg) {
+            const img = new Image();
+            img.src = sig.bg;
+            img.onload = () => setBackgroundImage(img);
+        } else if (!sig.paths && !sig.text) {
+            // Handling legacy/uploaded images as background for markup
+            const img = new Image();
+            img.src = sig.dataUrl;
+            img.onload = () => setBackgroundImage(img);
+        } else {
+            setBackgroundImage(null);
+        }
+
+        setActiveSection('create');
+    };
+
     const handleSubmit = () => {
-        const signatureData = createSignaturePNG(signaturePaths, textElements, signatureColor);
+        const signatureData = createSignaturePNG(signaturePaths, textElements, signatureColor, backgroundImage);
         if (signatureData) {
             onSubmit({
                 id: Date.now(),
@@ -302,7 +342,7 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
 
     if (!show) return null;
 
-    const hasContent = signaturePaths.length > 0 || textElements.some((el) => el.text.length > 0);
+    const hasContent = signaturePaths.length > 0 || textElements.some((el) => el.text.length > 0) || backgroundImage;
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 backdrop-blur-sm">
@@ -322,6 +362,41 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
                                     savedSignatures={savedSignatures}
                                     onInsert={handleInsertSavedSignature}
                                     onDelete={handleDeleteSavedSignature}
+                                    onUpload={(file) => {
+                                        const reader = new FileReader();
+                                        reader.onload = (e) => {
+                                            const img = new Image();
+                                            img.onload = () => {
+                                                const key = `signature_${Date.now()}`;
+                                                const sigData = {
+                                                    dataUrl: e.target.result,
+                                                    width: img.width > 200 ? 200 : img.width, // Limit max initial width
+                                                    height: img.width > 200 ? (img.height * (200 / img.width)) : img.height,
+                                                    name: file.name.replace(/\.[^/.]+$/, ""), // Remove extension
+                                                    bg: e.target.result // Save as background for potential future edits
+                                                };
+                                                localStorage.setItem(key, JSON.stringify(sigData));
+                                                setSavedSignatures(loadSavedSignatures());
+                                                showSuccessMessage();
+                                            };
+                                            img.src = e.target.result;
+                                        };
+                                        reader.readAsDataURL(file);
+                                    }}
+                                    onRename={(key, newName) => {
+                                        try {
+                                            const item = localStorage.getItem(key);
+                                            if (item) {
+                                                const data = JSON.parse(item);
+                                                data.name = newName;
+                                                localStorage.setItem(key, JSON.stringify(data));
+                                                setSavedSignatures(loadSavedSignatures());
+                                            }
+                                        } catch (e) {
+                                            console.error("Error renaming signature", e);
+                                        }
+                                    }}
+                                    onEdit={handleEditSavedSignature}
                                 />
                             ) : (
                                 <div className="text-center py-8 sm:py-12">
@@ -362,6 +437,7 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
                                 signatureColor={signatureColor}
                                 fontSize={fontSize}
                                 strokeWidth={strokeWidth}
+                                backgroundImage={backgroundImage}
                             />
                         </div>
                     )}

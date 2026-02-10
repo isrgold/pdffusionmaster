@@ -87,7 +87,7 @@ const PDFEditor = () => {
 
         for (let i = 1; i <= pdf.numPages; i++) {
           const page = await pdf.getPage(i);
-          const thumbnail = await renderPageThumbnail(page);
+          // Skip initial thumbnail generation
           newPages.push({
             id: generateId(),
             pdfPage: page,
@@ -95,7 +95,7 @@ const PDFEditor = () => {
             pageIndex: i - 1,
             rotation: 0,
             fileName: file.name,
-            thumbnail
+            thumbnail: null // Will be loaded lazily
           });
         }
 
@@ -118,6 +118,12 @@ const PDFEditor = () => {
         alert(`Error loading ${file.name}`);
       }
     }
+  };
+
+  const updatePageThumbnail = (pageId, thumbnail) => {
+    setPages(prev => prev.map(p =>
+      p.id === pageId ? { ...p, thumbnail } : p
+    ));
   };
 
   const handleToolClick = (pos) => {
@@ -220,6 +226,7 @@ const PDFEditor = () => {
             onSelectPage={handlePageSelect}
             onAddFiles={() => fileInputRef.current?.click()}
             onClose={() => setShowSidebar(false)}
+            onUpdateThumbnail={updatePageThumbnail}
           />
         </div>
       )}
@@ -234,22 +241,33 @@ const PDFEditor = () => {
       />
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 relative">
 
+        {/* Background Decorative Elements */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-400/10 rounded-full blur-[120px]" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-400/10 rounded-full blur-[120px]" />
+        </div>
 
-        <div className="flex-1 overflow-auto p-8 relative flex justify-center bg-gray-50/50">
+        <div className="flex-1 overflow-auto p-4 sm:p-8 relative flex justify-center z-10">
           {!pages.length ? (
-            <div className="flex flex-col items-center justify-center p-12 bg-white rounded-2xl shadow-sm border border-dashed border-gray-300 h-fit my-auto max-w-md text-center">
-              <div className="bg-blue-50 p-4 rounded-full mb-6">
-                <Upload className="text-blue-500" size={40} />
+            <div className="flex flex-col items-center justify-center p-12 bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl border border-white/50 h-fit my-auto max-w-lg text-center transition-all duration-300 hover:shadow-2xl">
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl mb-8 shadow-inner">
+                <Upload className="text-blue-600" size={48} strokeWidth={1.5} />
               </div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">Upload PDF</h2>
-              <p className="text-gray-500 mb-8">Upload a PDF file to start editing, signing, and rearranging pages.</p>
+              <h2 className="text-3xl font-bold text-gray-900 mb-3 tracking-tight">Upload PDF</h2>
+              <p className="text-gray-500 mb-8 max-w-sm leading-relaxed">
+                Unlock the full potential of your documents. Upload a PDF to start editing, signing, and organizing pages with ease.
+              </p>
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-semibold shadow-lg shadow-blue-200 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                className="group relative bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-2xl font-semibold shadow-lg shadow-blue-500/30 transition-all hover:scale-[1.02] active:scale-[0.98] overflow-hidden"
               >
-                Choose PDF Files
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 to-indigo-400/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <span className="relative flex items-center gap-2">
+                  Choose PDF Files
+                  <Upload size={18} className="opacity-70" />
+                </span>
               </button>
             </div>
           ) : (
@@ -261,14 +279,21 @@ const PDFEditor = () => {
                 deleteSelectedElement={deleteSelectedElement}
                 clearPageElements={clearPageElements}
                 downloadPDF={handleDownloadPDF}
+                onRotatePage={() => {
+                  if (currentPageId) {
+                    setPages(prev => prev.map(p =>
+                      p.id === currentPageId ? { ...p, rotation: (p.rotation + 90) % 360 } : p
+                    ));
+                  }
+                }}
                 hasElements={elements.length > 0 || pages.length > 0}
                 isDownloading={isDownloading}
                 showSidebar={showSidebar}
                 setShowSidebar={setShowSidebar}
               />
 
-              <div className="mt-20 w-fit max-w-full">
-                <div className="bg-white shadow-2xl shadow-gray-200/50 rounded-lg p-1 min-h-[600px] flex justify-center items-start border border-gray-100">
+              <div className="mt-24 w-fit max-w-full pb-20">
+                <div className="bg-white/95 backdrop-blur-sm shadow-2xl shadow-gray-900/10 rounded-xl overflow-hidden border border-gray-100 transition-all duration-300">
                   {currentPageObj && (
                     <PDFViewer
                       page={currentPageObj}

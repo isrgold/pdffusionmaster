@@ -9,64 +9,83 @@ const drawQuadraticCurve = (ctx, points, color) => {
     ctx.lineJoin = 'round';
 
     if (points.length === 2) {
-        // For two points, draw a simple line
-        ctx.lineWidth = points[0].width || 2;
         ctx.beginPath();
+        ctx.lineWidth = points[0].width;
         ctx.moveTo(points[0].x, points[0].y);
         ctx.lineTo(points[1].x, points[1].y);
         ctx.stroke();
         return;
     }
 
-    // For multiple points, use quadratic curves
-    for (let i = 1; i < points.length - 1; i++) {
-        const prevPoint = points[i - 1];
-        const currentPoint = points[i];
-        const nextPoint = points[i + 1];
+    // Loop through points and draw quadratic curves
+    // To make it smoother with variable width, we might need to draw small segments
+    // But for performance, we'll rely on the browser's stroke with the starting width of the segment
+    // A better approach for variable width is to fill a polygon, but that's complex.
+    // We will stick to stroking but average the widths.
 
-        // Calculate control point (midpoint between current and next)
-        const controlPoint = {
-            x: (currentPoint.x + nextPoint.x) / 2,
-            y: (currentPoint.y + nextPoint.y) / 2
+    ctx.beginPath();
+    // Move to the first point
+    ctx.moveTo(points[0].x, points[0].y);
+
+    for (let i = 1; i < points.length - 1; i++) {
+        const p1 = points[i];
+        const p2 = points[i + 1];
+
+        const midPoint = {
+            x: (p1.x + p2.x) / 2,
+            y: (p1.y + p2.y) / 2
         };
 
-        // Set line width based on stored width
-        ctx.lineWidth = currentPoint.width || 2;
+        // We set the line width to the current point's width
+        // Note: Canvas stroke doesn't interpolate width along a single path.
+        // To strictly follow the "pressure" look, we should draw segments.
+        // However, drawing many small paths is expensive.
+        // Let's try drawing each quadratic curve segment as a separate path to vary width.
+    }
 
+    // Actually, let's redraw using the component approach:
+    // We need to iterate and stroke each segment individually to change lineWidth
+
+    for (let i = 1; i < points.length - 1; i++) {
         ctx.beginPath();
+
+        const p0 = points[i - 1];
+        const p1 = points[i];
+        const p2 = points[i + 1];
+
+        // Start from the previous midpoint
         if (i === 1) {
-            ctx.moveTo(prevPoint.x, prevPoint.y);
+            ctx.moveTo(p0.x, p0.y);
         } else {
-            const prevControlPoint = {
-                x: (prevPoint.x + currentPoint.x) / 2,
-                y: (prevPoint.y + currentPoint.y) / 2
-            };
-            ctx.moveTo(prevControlPoint.x, prevControlPoint.y);
+            ctx.moveTo((p0.x + p1.x) / 2, (p0.y + p1.y) / 2);
         }
-        
-        ctx.quadraticCurveTo(currentPoint.x, currentPoint.y, controlPoint.x, controlPoint.y);
+
+        const midPoint = {
+            x: (p1.x + p2.x) / 2,
+            y: (p1.y + p2.y) / 2
+        };
+
+        ctx.quadraticCurveTo(p1.x, p1.y, midPoint.x, midPoint.y);
+
+        // Use average width for this segment
+        ctx.lineWidth = p1.width;
         ctx.stroke();
     }
 
-    // Draw the last segment
+    // Draw last segment
     const secondLast = points[points.length - 2];
     const last = points[points.length - 1];
-    
-    ctx.lineWidth = last.width || 2;
+
     ctx.beginPath();
-    
-    const controlPoint = {
-        x: (secondLast.x + last.x) / 2,
-        y: (secondLast.y + last.y) / 2
-    };
-    ctx.moveTo(controlPoint.x, controlPoint.y);
+    ctx.moveTo((secondLast.x + last.x) / 2, (secondLast.y + last.y) / 2);
     ctx.lineTo(last.x, last.y);
+    ctx.lineWidth = last.width;
     ctx.stroke();
 };
 
-export const createSignaturePNG = (signaturePaths, textElements, color) => {
+export const createSignaturePNG = (signaturePaths, textElements, color, backgroundImage) => {
     if (signaturePaths.length === 0 && textElements.length === 0) return null;
-    
+
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
     // Calculate bounds for signature paths
@@ -107,6 +126,15 @@ export const createSignaturePNG = (signaturePaths, textElements, color) => {
     // Set canvas background to transparent
     ctx.clearRect(0, 0, width, height);
 
+    // Draw background image if exists
+    if (backgroundImage) {
+        const imgAspectRatio = backgroundImage.width / backgroundImage.height;
+        // Determine how it was rendered on canvas to approximate scale, 
+        // OR just draw it to fit bounds. 
+        // For simplicity in export, we scale it to fit the bounds we calculated + padding
+        ctx.drawImage(backgroundImage, 0, 0, width, height);
+    }
+
     // Draw signature paths with smooth curves
     signaturePaths.forEach(path => {
         if (path.length > 1) {
@@ -122,10 +150,10 @@ export const createSignaturePNG = (signaturePaths, textElements, color) => {
             ctx.fillStyle = color;
             ctx.beginPath();
             ctx.arc(
-                path[0].x - minX + padding, 
-                path[0].y - minY + padding, 
-                (path[0].width || 2) / 2, 
-                0, 
+                path[0].x - minX + padding,
+                path[0].y - minY + padding,
+                (path[0].width || 2) / 2,
+                0,
                 2 * Math.PI
             );
             ctx.fill();
@@ -164,7 +192,7 @@ export const getMousePos = (e, canvasRef) => {
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
-    
+
     return {
         x: (e.clientX - rect.left) * scaleX,
         y: (e.clientY - rect.top) * scaleY

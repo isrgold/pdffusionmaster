@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useCanvasDrawing } from './hooks/useCanvasDrawing';
 import { useTextElements } from './hooks/useTextElements';
 import { useCanvasRenderer } from './hooks/useCanvasRenderer';
-import { useTouchEvents } from './hooks/useTouchEvents';
+
 import { getMousePos, getTextElementAt } from './signatureUtils';
 
 const CANVAS_CONFIG = {
@@ -20,9 +20,10 @@ const SignatureCanvas = ({
     signatureColor,
     fontSize,
     strokeWidth,
+    backgroundImage
 }) => {
     const [activeTextElement, setActiveTextElement] = useState(null);
-    
+
     const {
         isDrawing,
         setIsDrawing,
@@ -52,7 +53,8 @@ const SignatureCanvas = ({
         draggedElement,
         activeTextElement,
         currentPath,
-        drawQuadraticCurve
+        drawQuadraticCurve,
+        backgroundImage // Pass background image
     );
 
     const handleMouseDown = (e) => {
@@ -83,13 +85,17 @@ const SignatureCanvas = ({
             setIsDrawing(true);
             setLastPoint(pos);
             setLastVelocity(0);
-            
+
+            // Calculate initial width based on pressure
+            const pressure = e.pressure;
+            const initialWidth = getLineWidth(0, pressure);
+
             const pointWithWidth = {
                 ...pos,
-                width: 2,
+                width: initialWidth,
                 timestamp: Date.now()
             };
-            
+
             setCurrentPath([pointWithWidth]);
         }
     };
@@ -101,7 +107,7 @@ const SignatureCanvas = ({
         if (draggedElement) {
             const newX = pos.x - dragOffset.x;
             const newY = pos.y - dragOffset.y;
-            
+
             setTextElements(prev =>
                 prev.map(el =>
                     el.id === draggedElement.id
@@ -116,9 +122,10 @@ const SignatureCanvas = ({
             const currentTime = Date.now();
             const timeDelta = currentTime - (lastPoint.timestamp || currentTime);
             const dist = distance(lastPoint, pos);
-            
+
             const velocity = timeDelta > 0 ? dist / Math.max(timeDelta, 1) : 0;
-            const lineWidth = getLineWidth(velocity);
+            const pressure = e.pressure; // Get pressure from PointerEvent
+            const lineWidth = getLineWidth(velocity, pressure);
 
             const pointWithWidth = {
                 ...pos,
@@ -133,23 +140,19 @@ const SignatureCanvas = ({
 
     const handleMouseUp = (e) => {
         e.preventDefault();
-        
+
         if (isDrawing && currentPath.length > 0) {
             setSignaturePaths(prev => [...prev, currentPath]);
             setCurrentPath([]);
         }
-        
+
         setIsDrawing(false);
         setDraggedElement(null);
         setLastPoint(null);
         setLastVelocity(0);
     };
 
-    const {
-        handleTouchStart,
-        handleTouchMove,
-        handleTouchEnd
-    } = useTouchEvents(handleMouseDown, handleMouseMove, handleMouseUp);
+
 
     useEffect(() => {
         redrawCanvas();
@@ -162,16 +165,12 @@ const SignatureCanvas = ({
                     ref={canvasRef}
                     width={CANVAS_CONFIG.width}
                     height={CANVAS_CONFIG.height}
-                    onMouseDown={handleMouseDown}
-                    onMouseMove={handleMouseMove}
-                    onMouseUp={handleMouseUp}
-                    onMouseLeave={handleMouseUp}
-                    onTouchStart={handleTouchStart}
-                    onTouchMove={handleTouchMove}
-                    onTouchEnd={handleTouchEnd}
-                    className={`w-full bg-white rounded-lg border-2 border-gray-200 shadow-sm ${
-                        mode === 'draw' ? 'cursor-crosshair' : 'cursor-pointer'
-                    } hover:border-blue-400 transition-colors duration-200`}
+                    onPointerDown={handleMouseDown}
+                    onPointerMove={handleMouseMove}
+                    onPointerUp={handleMouseUp}
+                    onPointerLeave={handleMouseUp}
+                    className={`w-full bg-white rounded-lg border-2 border-gray-200 shadow-sm ${mode === 'draw' ? 'cursor-crosshair' : 'cursor-pointer'
+                        } hover:border-blue-400 transition-colors duration-200`}
                     style={{ touchAction: 'none' }}
                 />
                 <div className="flex items-center justify-center mt-3">
