@@ -38,7 +38,7 @@ const SavedSignatures = ({ savedSignatures, onInsert, onDelete, onUpload, onRena
                     <input
                         type="file"
                         ref={fileInputRef}
-                        accept="image/png,image/jpeg"
+                        accept="image/png,.png"
                         className="hidden"
                         onChange={handleFileChange}
                     />

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Check, Download, Save, Eraser, Sparkles, FileSignature, Plus } from 'lucide-react';
+import { X, Check, Download, Save, Eraser, Sparkles, FileSignature, Plus, Upload } from 'lucide-react';
 import SignatureCanvas from './SignatureCanvas';
 import SignatureToolbar from './SignatureToolbar';
 import SavedSignatures from './SavedSignatures';
-import { createSignaturePNG, loadSavedSignatures } from './signatureUtils';
+import { createSignaturePNG, loadSavedSignatures, compressImageForStorage, safeSaveToStorage } from './signatureUtils';
 
 // Modal Header Component
 const ModalHeader = ({ onClose, activeSection }) => (
@@ -199,16 +199,13 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
     const [showSuccess, setShowSuccess] = useState(false);
     const [activeSection, setActiveSection] = useState('saved');
     const canvasRef = useRef(null);
+    const emptyFileInputRef = useRef(null);
 
     const [backgroundImage, setBackgroundImage] = useState(null);
 
     useEffect(() => {
         if (show) {
             setSavedSignatures(loadSavedSignatures());
-            // Don't override activeSection if we are in "edit" mode (handled by onEdit)
-            if (activeSection === 'saved' && loadSavedSignatures().length === 0) {
-                setActiveSection('create');
-            }
             document.body.style.overflow = 'hidden';
             // Prevent zoom on iOS
             document.addEventListener('touchmove', preventZoom, { passive: false });
@@ -230,6 +227,57 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
             document.removeEventListener('gestureend', preventZoom);
         };
     }, [show]);
+
+    const handleUploadSignatureFile = (file) => {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const compressed = compressImageForStorage(img, 400);
+                const key = `signature_${Date.now()}`;
+                const sigData = {
+                    dataUrl: compressed.dataUrl,
+                    width: compressed.width,
+                    height: compressed.height,
+                    name: file.name.replace(/\.[^/.]+$/, ""),
+                    bg: compressed.dataUrl
+                };
+                if (safeSaveToStorage(key, sigData)) {
+                    setSavedSignatures(loadSavedSignatures());
+                    showSuccessMessage();
+                }
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handleImageUploadInCreate = (file) => {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                setBackgroundImage(img);
+                const compressed = compressImageForStorage(img, 400);
+                const key = `signature_${Date.now()}`;
+                const sigData = {
+                    dataUrl: compressed.dataUrl,
+                    width: compressed.width,
+                    height: compressed.height,
+                    name: file.name.replace(/\.[^/.]+$/, ""),
+                    bg: compressed.dataUrl
+                };
+                if (safeSaveToStorage(key, sigData)) {
+                    setSavedSignatures(loadSavedSignatures());
+                    showSuccessMessage();
+                }
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    };
 
     const preventZoom = (e) => {
         if (e.touches && e.touches.length > 1) {
@@ -278,9 +326,10 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
             name: 'Saved Signature'
         };
 
-        localStorage.setItem(key, JSON.stringify(fullState));
-        setSavedSignatures(loadSavedSignatures());
-        showSuccessMessage();
+        if (safeSaveToStorage(key, fullState)) {
+            setSavedSignatures(loadSavedSignatures());
+            showSuccessMessage();
+        }
     };
 
     const handleDeleteSavedSignature = (key) => {
@@ -362,27 +411,7 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
                                     savedSignatures={savedSignatures}
                                     onInsert={handleInsertSavedSignature}
                                     onDelete={handleDeleteSavedSignature}
-                                    onUpload={(file) => {
-                                        const reader = new FileReader();
-                                        reader.onload = (e) => {
-                                            const img = new Image();
-                                            img.onload = () => {
-                                                const key = `signature_${Date.now()}`;
-                                                const sigData = {
-                                                    dataUrl: e.target.result,
-                                                    width: img.width > 200 ? 200 : img.width, // Limit max initial width
-                                                    height: img.width > 200 ? (img.height * (200 / img.width)) : img.height,
-                                                    name: file.name.replace(/\.[^/.]+$/, ""), // Remove extension
-                                                    bg: e.target.result // Save as background for potential future edits
-                                                };
-                                                localStorage.setItem(key, JSON.stringify(sigData));
-                                                setSavedSignatures(loadSavedSignatures());
-                                                showSuccessMessage();
-                                            };
-                                            img.src = e.target.result;
-                                        };
-                                        reader.readAsDataURL(file);
-                                    }}
+                                    onUpload={handleUploadSignatureFile}
                                     onRename={(key, newName) => {
                                         try {
                                             const item = localStorage.getItem(key);
@@ -400,18 +429,37 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
                                 />
                             ) : (
                                 <div className="text-center py-8 sm:py-12">
+                                    <input
+                                        type="file"
+                                        ref={emptyFileInputRef}
+                                        accept="image/png,.png"
+                                        className="hidden"
+                                        onChange={(e) => {
+                                            if (e.target.files?.[0]) handleUploadSignatureFile(e.target.files[0]);
+                                            e.target.value = null;
+                                        }}
+                                    />
                                     <div className="mx-auto w-12 sm:w-16 h-12 sm:h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
                                         <FileSignature size={20} className="sm:w-6 sm:h-6 text-gray-400" />
                                     </div>
                                     <h4 className="text-base sm:text-lg font-medium text-gray-900 mb-2">No saved signatures</h4>
-                                    <p className="text-gray-500 text-sm mb-4 sm:mb-6">Create your first signature to save it for future use</p>
-                                    <button
-                                        onClick={() => setActiveSection('create')}
-                                        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 text-sm"
-                                    >
-                                        <Plus size={14} />
-                                        Create Signature
-                                    </button>
+                                    <p className="text-gray-500 text-sm mb-4 sm:mb-6">Upload an existing PNG image or draw/type a new signature</p>
+                                    <div className="flex flex-wrap justify-center items-center gap-3">
+                                        <button
+                                            onClick={() => emptyFileInputRef.current?.click()}
+                                            className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors duration-200 text-sm font-medium shadow-sm"
+                                        >
+                                            <Upload size={16} />
+                                            Upload PNG / Image
+                                        </button>
+                                        <button
+                                            onClick={() => setActiveSection('create')}
+                                            className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 text-sm font-medium shadow-sm"
+                                        >
+                                            <Plus size={16} />
+                                            Create Signature
+                                        </button>
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -426,6 +474,7 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
                                 setFontSize={setFontSize}
                                 strokeWidth={strokeWidth}
                                 setStrokeWidth={setStrokeWidth}
+                                onUploadImage={handleImageUploadInCreate}
                             />
                             <SignatureCanvas
                                 mode={mode}

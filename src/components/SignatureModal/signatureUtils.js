@@ -174,6 +174,41 @@ export const createSignaturePNG = (signaturePaths, textElements, color, backgrou
     };
 };
 
+export const compressImageForStorage = (img, maxDim = 400) => {
+    let width = img.width || 400;
+    let height = img.height || 200;
+    if (width > maxDim || height > maxDim) {
+        if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+        } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+        }
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, width, height);
+    return {
+        dataUrl: canvas.toDataURL('image/png'),
+        width,
+        height
+    };
+};
+
+export const safeSaveToStorage = (key, sigData) => {
+    try {
+        localStorage.setItem(key, JSON.stringify(sigData));
+        return true;
+    } catch (e) {
+        console.error("Storage quota exceeded", e);
+        alert("אחסון הדפדפן מלא (QuotaExceededError). מחק חתימות ישנות כדי לפנות מקום.");
+        return false;
+    }
+};
+
 export const loadSavedSignatures = () => {
     return Object.keys(localStorage)
         .filter(k => k.startsWith('signature_'))

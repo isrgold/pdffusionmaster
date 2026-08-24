@@ -1,7 +1,7 @@
 
 // PDFEditor.jsx - Main component
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload } from 'lucide-react';
+import { Upload, CheckCircle } from 'lucide-react';
 import { DndContext, closestCenter } from '@dnd-kit/core';
 import { arrayMove, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import Toolbar from './components/Toolbar';
@@ -27,6 +27,7 @@ const PDFEditor = () => {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isDownloading, setIsDownloading] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [showSaveSuccess, setShowSaveSuccess] = useState(false);
 
   // Modal states
   const [showTextModal, setShowTextModal] = useState(false);
@@ -41,6 +42,38 @@ const PDFEditor = () => {
   useEffect(() => {
     loadPDFLibraries();
   }, []);
+
+  // Intersection Observer for Current Page tracking
+  useEffect(() => {
+    const options = {
+      root: null, // Use the viewport
+      rootMargin: '0px',
+      threshold: 0.5 // Trigger when 50% of the page is visible
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const pageId = entry.target.dataset.pageId;
+          if (pageId) {
+            setCurrentPageId(pageId);
+          }
+        }
+      });
+    }, options);
+
+    // Observe all page elements
+    pages.forEach(page => {
+      const element = document.getElementById(`page-${page.id}`);
+      if (element) {
+        observer.observe(element);
+      }
+    });
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [pages]);
 
   // Keyboard event handler
   useEffect(() => {
@@ -126,12 +159,24 @@ const PDFEditor = () => {
     ));
   };
 
-  const handleToolClick = (pos) => {
+  const handleToolClick = (pos, pageId) => {
+    // Determine the page if not passed (though it should be passed from the specific PDFViewer)
+    // For now we rely on the caller passing it, or falling back to currentPageId if we are cautious
+    const targetPageId = pageId || currentPageId;
+
     if (tool === 'text') {
       setClickPosition(pos);
+      // We might need to store the targetPageId in a state if the modal doesn't capture it immediately?
+      // Actually, addElement uses currentPageId, so we MUST update currentPageId when clicking a page.
+      if (pageId && pageId !== currentPageId) {
+        setCurrentPageId(pageId);
+      }
       setShowTextModal(true);
     } else if (tool === 'signature') {
       setClickPosition(pos);
+      if (pageId && pageId !== currentPageId) {
+        setCurrentPageId(pageId);
+      }
       setShowSignatureModal(true);
     }
   };
@@ -199,13 +244,26 @@ const PDFEditor = () => {
       documents,
       pages,
       elements,
-      setIsDownloading
+      setIsDownloading,
+      onSaveSuccess: () => {
+        setShowSaveSuccess(true);
+        setTimeout(() => setShowSaveSuccess(false), 3500);
+      }
     });
   };
 
   // Page Management Handlers
   const handlePageSelect = (index) => {
-    if (pages[index]) setCurrentPageId(pages[index].id);
+    if (pages[index]) {
+      const pageId = pages[index].id;
+      setCurrentPageId(pageId);
+
+      // Scroll to the page
+      const pageElement = document.getElementById(`page-${pageId}`);
+      if (pageElement) {
+        pageElement.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
   };
 
   const getCurrentPageIndex = () => {
@@ -271,7 +329,7 @@ const PDFEditor = () => {
               </button>
             </div>
           ) : (
-            <>
+            <div className="flex flex-col items-center w-full">
               <Toolbar
                 tool={tool}
                 setTool={setTool}
@@ -292,24 +350,41 @@ const PDFEditor = () => {
                 setShowSidebar={setShowSidebar}
               />
 
-              <div className="mt-24 w-fit max-w-full pb-20">
+              <div className="mt-20 w-fit max-w-full pb-20">
                 <div className="bg-white/95 backdrop-blur-sm shadow-2xl shadow-gray-900/10 rounded-xl overflow-hidden border border-gray-100 transition-all duration-300">
-                  {currentPageObj && (
-                    <PDFViewer
-                      page={currentPageObj}
-                      elements={elements.filter(e => e.pageId === currentPageId)}
-                      selectedElement={selectedElement}
-                      tool={tool}
-                      onToolClick={handleToolClick}
-                      onElementSelect={handleElementSelect}
-                      onElementMove={handleElementMove}
-                      onElementResize={handleElementResize}
-                      onElementRelease={handleElementRelease}
-                    />
-                  )}
+                  <div className="flex flex-col gap-8 items-center py-8" id="pdf-scroll-container">
+                    {pages.map((page) => (
+                      <div
+                        key={page.id}
+                        id={`page-${page.id}`}
+                        className="relative shadow-lg"
+                        data-page-id={page.id}
+                      >
+                        <PDFViewer
+                          page={page}
+                          elements={elements.filter(e => e.pageId === page.id)}
+                          selectedElement={selectedElement}
+                          tool={tool}
+                          onToolClick={(pos) => {
+                            // We need to ensure we know which page was clicked
+                            setCurrentPageId(page.id);
+                            handleToolClick(pos, page.id);
+                          }}
+                          onElementSelect={handleElementSelect}
+                          onElementMove={handleElementMove}
+                          onElementResize={handleElementResize}
+                          onElementRelease={handleElementRelease}
+                        />
+                        {/* Page Number Indicator */}
+                        <div className="absolute top-2 right-[-40px] bg-gray-500 text-white text-xs px-2 py-1 rounded">
+                          {page.pageIndex + 1}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </>
+            </div>
           )}
         </div>
       </div>
@@ -327,6 +402,14 @@ const PDFEditor = () => {
         onSubmit={addElement}
         clickPosition={clickPosition}
       />
+
+      {/* Success Save Toast Notification */}
+      {showSaveSuccess && (
+        <div className="fixed top-20 right-6 z-50 flex items-center gap-3 bg-emerald-600 text-white px-6 py-4 rounded-2xl shadow-2xl shadow-emerald-900/30 border border-emerald-400/40 animate-in fade-in slide-in-from-top-4 duration-300">
+          <CheckCircle size={22} className="text-emerald-100" />
+          <span className="font-semibold text-base tracking-wide">המסמך נשמר בהצלחה!</span>
+        </div>
+      )}
     </div>
   );
 };

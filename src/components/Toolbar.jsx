@@ -51,8 +51,8 @@ const Toolbar = ({
   onRotatePage
 }) => {
   return (
-    <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50 w-[95%] sm:w-auto max-w-full overflow-x-auto custom-scrollbar">
-      <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 bg-white/80 backdrop-blur-xl border border-white/60 shadow-2xl shadow-gray-900/5 rounded-2xl ring-1 ring-black/5 min-w-max">
+    <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[95%] sm:w-auto max-w-full overflow-x-auto custom-scrollbar">
+      <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 bg-white/95 backdrop-blur-2xl border border-gray-300 shadow-2xl shadow-slate-900/20 rounded-2xl ring-1 ring-slate-900/10 min-w-max">
 
         {/* View Actions */}
         <div className="flex items-center gap-1 pr-2 sm:pr-3 border-r border-gray-200/50">
