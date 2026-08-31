@@ -15,21 +15,24 @@ export const getPdfJs = async () => {
 };
 
 export const loadPDFLibraries = async () => {
-  // Preload
   await getPdfJs();
 };
 
 export const renderPageThumbnail = async (page) => {
-  const viewport = page.getViewport({ scale: 0.2 }); // Small scale for thumbnail
+  const dpr = Math.max(window.devicePixelRatio || 1, 2);
+  const viewport = page.getViewport({ scale: 0.3 * dpr });
   const canvas = document.createElement('canvas');
   const context = canvas.getContext('2d');
-  canvas.height = viewport.height;
-  canvas.width = viewport.width;
+  canvas.height = Math.floor(viewport.height);
+  canvas.width = Math.floor(viewport.width);
+
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = 'high';
 
   await page.render({
     canvasContext: context,
     viewport: viewport
   }).promise;
 
-  return canvas.toDataURL();
+  return canvas.toDataURL('image/jpeg', 0.85);
 };

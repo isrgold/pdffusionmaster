@@ -234,14 +234,14 @@ const PageManager = ({ pages, setPages, selectedPageIndex, onSelectPage, onAddFi
                         <div className="p-1.5 bg-blue-100 rounded-lg text-blue-600">
                             <Layers size={18} strokeWidth={2.5} />
                         </div>
-                        <h3 className="font-bold text-sm tracking-wide text-gray-800 uppercase">Pages ({pages.length})</h3>
+                        <h3 className="font-bold text-sm tracking-wide text-gray-800">ניהול עמודים ({pages.length})</h3>
                     </div>
 
                     {onClose && (
                         <button
                             onClick={onClose}
                             className="p-2 bg-transparent hover:bg-gray-100 text-gray-500 rounded-lg transition-all"
-                            title="Collapse Sidebar"
+                            title="סגור סרגל"
                         >
                             <ChevronLeft size={20} />
                         </button>
@@ -249,10 +249,10 @@ const PageManager = ({ pages, setPages, selectedPageIndex, onSelectPage, onAddFi
                 </div>
                 <button
                     onClick={onAddFiles}
-                    className="mt-2 w-full flex items-center justify-center gap-2 bg-gray-900 border border-transparent hover:bg-gray-800 text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-lg shadow-gray-900/10 active:scale-[0.98] group"
+                    className="mt-2 w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-md shadow-blue-500/20 active:scale-[0.98] group"
                 >
-                    <Plus size={16} className="text-white/70 group-hover:text-white transition-colors" />
-                    <span>Add Pages</span>
+                    <Plus size={16} className="text-white/80 group-hover:text-white transition-colors" />
+                    <span>הוסף קבצים / עמודים</span>
                 </button>
             </div>
 

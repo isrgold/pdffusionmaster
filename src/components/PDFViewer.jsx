@@ -1,5 +1,6 @@
 // components/PDFViewer.jsx
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
+import { FileText, Loader2 } from 'lucide-react';
 
 const PDFViewer = ({
   page,
@@ -12,34 +13,118 @@ const PDFViewer = ({
   onElementResize,
   onElementRelease
 }) => {
+  const containerRef = useRef(null);
   const canvasRef = useRef(null);
   const renderTaskRef = useRef(null);
 
-  // Interaction state: { type: 'move'|'resize', handle: string, startX, startY, initialEl: {...} }
-  const [interactionState, setInteractionState] = React.useState(null);
+  const [isVisible, setIsVisible] = useState(false);
+  const [isRendering, setIsRendering] = useState(false);
+  const [interactionState, setInteractionState] = useState(null);
 
+  // Calculate target page dimensions
+  const rotation = page.rotation || 0;
+  const isRotated90or270 = rotation === 90 || rotation === 270;
+
+  const rawWidth = page.originalWidth || 595.28;
+  const rawHeight = page.originalHeight || 841.89;
+
+  const scaledWidth = (isRotated90or270 ? rawHeight : rawWidth) * 1.5;
+  const scaledHeight = (isRotated90or270 ? rawWidth : rawHeight) * 1.5;
+  const aspectRatio = scaledWidth / scaledHeight;
+
+  // 1. Intersection Observer for Virtualization
   useEffect(() => {
-    if (page) {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsVisible(entry.isIntersecting);
+      },
+      {
+        root: null,
+        rootMargin: '300px 0px 300px 0px' // Render 300px ahead/behind viewport
+      }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // 2. Render or Cleanup Canvas on Visibility / Page / Rotation changes
+  useEffect(() => {
+    if (isVisible && page && page.pdfPage) {
       renderPage();
+    } else {
+      cleanupCanvas();
     }
-  }, [page]); // Re-render when page object changes
+
+    return () => {
+      cleanupCanvas();
+    };
+  }, [isVisible, page, rotation]);
+
+  const cleanupCanvas = () => {
+    if (renderTaskRef.current) {
+      try {
+        renderTaskRef.current.cancel();
+      } catch (e) {
+        // Ignore cancel errors
+      }
+      renderTaskRef.current = null;
+    }
+    if (canvasRef.current) {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+      // Setting width/height to 0 immediately releases GPU/RAM pixel buffers
+      canvas.width = 0;
+      canvas.height = 0;
+    }
+    setIsRendering(false);
+  };
 
   const renderPage = async () => {
-    if (!page || !page.pdfPage) return;
+    if (!page || !page.pdfPage || !canvasRef.current || !containerRef.current) return;
 
     if (renderTaskRef.current) {
-      renderTaskRef.current.cancel();
+      try {
+        renderTaskRef.current.cancel();
+      } catch (e) {}
     }
 
+    setIsRendering(true);
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
+    // Opaque 2d context enables OS subpixel ClearType font anti-aliasing
+    const ctx = canvas.getContext('2d', { alpha: false });
     const pdfPage = page.pdfPage;
 
-    // Use rotation from page object if available (not fully implemented in edit yet, but ready)
-    const viewport = pdfPage.getViewport({ scale: 1.5, rotation: page.rotation || 0 });
+    // Get exact CSS pixel width of the display container on user screen
+    const containerWidth = containerRef.current.clientWidth || scaledWidth;
+    const dpr = window.devicePixelRatio || 1;
 
-    canvas.height = viewport.height;
-    canvas.width = viewport.width;
+    // Calculate exact viewport scale for 1-to-1 hardware pixel alignment
+    const basePageWidth = isRotated90or270 ? rawHeight : rawWidth;
+    const renderScale = (containerWidth / basePageWidth) * dpr;
+
+    const viewport = pdfPage.getViewport({ scale: renderScale, rotation: rotation });
+
+    // Match canvas pixel buffer to exact physical screen pixels (1-to-1 mapping)
+    canvas.width = Math.round(viewport.width);
+    canvas.height = Math.round(viewport.height);
+
+    // Set explicit CSS dimensions matching container to avoid GPU resampling blur
+    canvas.style.width = `${containerWidth}px`;
+    canvas.style.height = `${Math.round(containerWidth / aspectRatio)}px`;
+
+    // Pre-fill white background to activate ClearType subpixel text smoothing
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
 
     const renderContext = {
       canvasContext: ctx,
@@ -47,18 +132,28 @@ const PDFViewer = ({
     };
 
     try {
-      renderTaskRef.current = pdfPage.render(renderContext);
-      await renderTaskRef.current.promise;
+      const renderTask = pdfPage.render(renderContext);
+      renderTaskRef.current = renderTask;
+      await renderTask.promise;
       renderTaskRef.current = null;
+      setIsRendering(false);
     } catch (error) {
       if (error.name !== 'RenderingCancelledException') {
         console.error('Error rendering page:', error);
       }
+      setIsRendering(false);
     }
   };
 
   const getMousePos = (e) => {
     const canvas = canvasRef.current;
+    if (!canvas || canvas.width === 0 || canvas.height === 0) {
+      const rect = containerRef.current.getBoundingClientRect();
+      return {
+        x: (e.clientX - rect.left) * (scaledWidth / rect.width),
+        y: (e.clientY - rect.top) * (scaledHeight / rect.height)
+      };
+    }
     const rect = canvas.getBoundingClientRect();
     return {
       x: (e.clientX - rect.left) * (canvas.width / rect.width),
@@ -68,44 +163,31 @@ const PDFViewer = ({
 
   const getElementAt = (pos) => {
     return elements
-      .slice() // Copy to avoid mutating
-      .reverse() // Check top-most elements first
+      .slice()
+      .reverse()
       .find(el => {
         return pos.x >= el.x && pos.x <= el.x + el.width &&
           pos.y >= el.y && pos.y <= el.y + el.height;
       });
   };
 
-  // Helper to check if mouse is over a resize handle
   const getResizeHandleAt = (pos, element) => {
-    if (!element || !canvasRef.current) return null;
+    if (!element) return null;
 
     const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
+    const rect = canvas ? canvas.getBoundingClientRect() : containerRef.current.getBoundingClientRect();
 
-    // Calculate scale factors (canvas pixels per screen pixel)
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
+    const scaleX = scaledWidth / rect.width;
+    const scaleY = scaledHeight / rect.height;
 
-    // Visual handle size is 16px (w-4 h-4)
-    // We use a slightly larger hit area (24px) for better usability
     const screenHandleSize = 24;
-
-    // Convert screen size to canvas units
     const handleWidth = screenHandleSize * scaleX;
     const handleHeight = screenHandleSize * scaleY;
 
-    // Use current dimensions from interactions state if available, else element
     let elX = element.x;
     let elY = element.y;
     let elW = element.width;
     let elH = element.height;
-
-    if (interactionState && interactionState.initialEl.id === element.id) {
-      // Actually, for getResizeHandleAt, we usually check *before* interaction starts, 
-      // so we use the element's committed state. 
-      // During interaction, we don't strictly need to hover handles accurately until release.
-    }
 
     const handles = {
       nw: { x: elX, y: elY },
@@ -116,7 +198,6 @@ const PDFViewer = ({
 
     for (const handle in handles) {
       const h = handles[handle];
-      // Check if pos is within handle bounds centered at h.x, h.y
       if (pos.x >= h.x - handleWidth / 2 && pos.x <= h.x + handleWidth / 2 &&
         pos.y >= h.y - handleHeight / 2 && pos.y <= h.y + handleHeight / 2) {
         return handle;
@@ -126,6 +207,7 @@ const PDFViewer = ({
   };
 
   const handleCanvasMouseDown = (e) => {
+    if (!isVisible) return;
     const pos = getMousePos(e);
 
     if (tool === 'text' || tool === 'signature') {
@@ -134,19 +216,15 @@ const PDFViewer = ({
       const clickedElement = getElementAt(pos);
 
       if (clickedElement) {
-        // Select the element first (calls parent to update selectedElement)
         onElementSelect(clickedElement, pos);
-
         const handle = getResizeHandleAt(pos, clickedElement);
 
-        // Initialize local interaction state
         setInteractionState({
           type: handle ? 'resize' : 'move',
           handle: handle,
           startX: pos.x,
           startY: pos.y,
           initialEl: { ...clickedElement },
-          // Current deltas
           deltaX: 0,
           deltaY: 0
         });
@@ -155,9 +233,9 @@ const PDFViewer = ({
   };
 
   const handleCanvasMouseMove = (e) => {
+    if (!isVisible) return;
     const pos = getMousePos(e);
 
-    // 1. Handle Active Interaction (Local State Update)
     if (interactionState) {
       const deltaX = pos.x - interactionState.startX;
       const deltaY = pos.y - interactionState.startY;
@@ -170,12 +248,10 @@ const PDFViewer = ({
       return;
     }
 
-    // 2. Hover / Cursor Logic (No active interaction)
     if (tool === 'move') {
-      // Check for handles on SELECTED element
       if (selectedElement) {
         const handle = getResizeHandleAt(pos, selectedElement);
-        if (handle) {
+        if (handle && canvasRef.current) {
           const cursorMap = {
             nw: 'nw-resize',
             ne: 'ne-resize',
@@ -187,11 +263,10 @@ const PDFViewer = ({
         }
       }
 
-      // Check for hover over any element
       if (getElementAt(pos)) {
-        canvasRef.current.style.cursor = 'move';
+        if (canvasRef.current) canvasRef.current.style.cursor = 'move';
       } else {
-        canvasRef.current.style.cursor = 'default';
+        if (canvasRef.current) canvasRef.current.style.cursor = 'default';
       }
     }
   };
@@ -200,7 +275,6 @@ const PDFViewer = ({
     if (interactionState) {
       const { type, initialEl, deltaX, deltaY, handle } = interactionState;
 
-      // Calculate Final Bounds
       let newX = initialEl.x;
       let newY = initialEl.y;
       let newWidth = initialEl.width;
@@ -234,28 +308,21 @@ const PDFViewer = ({
         }
       }
 
-      // Commit changes to parent
-      // We use onElementResize for both move/resize since it accepts bounds
       onElementResize(initialEl.id, { x: newX, y: newY, width: newWidth, height: newHeight });
-
       setInteractionState(null);
     }
-
-    // onElementRelease(); // Optional, if parent does cleanup
   };
 
   const getCursorStyle = () => {
     switch (tool) {
-      case 'move': return 'default'; // managed dynamically in mouseMove
+      case 'move': return 'default';
       case 'text': return 'text';
       case 'signature': return 'crosshair';
       default: return 'default';
     }
   };
 
-  // Helper to get current display props for an element
   const getDisplayProps = (element) => {
-    // If this element is currently being interacted with, calculate its temporary state
     if (interactionState && interactionState.initialEl.id === element.id) {
       const { type, initialEl, deltaX, deltaY, handle } = interactionState;
 
@@ -300,10 +367,17 @@ const PDFViewer = ({
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-4">
+    <div className="bg-white rounded-lg shadow-lg p-4" ref={containerRef} dir="ltr" style={{ direction: 'ltr' }}>
       {/* Canvas Container */}
       <div
-        className="border-2 border-gray-200 rounded-lg overflow-hidden relative"
+        className="border-2 border-gray-200 rounded-lg overflow-hidden relative flex items-center justify-center bg-gray-50/80 transition-colors"
+        dir="ltr"
+        style={{
+          direction: 'ltr',
+          width: `${scaledWidth}px`,
+          maxWidth: '100%',
+          aspectRatio: `${aspectRatio}`
+        }}
         onMouseDown={handleCanvasMouseDown}
         onMouseMove={handleCanvasMouseMove}
         onMouseUp={handleMouseUp}
@@ -311,12 +385,29 @@ const PDFViewer = ({
       >
         <canvas
           ref={canvasRef}
-          className="block relative"
-          style={{ cursor: getCursorStyle() }}
+          dir="ltr"
+          className={`block relative w-full h-full object-contain ${!isVisible ? 'hidden' : ''}`}
+          style={{ cursor: getCursorStyle(), direction: 'ltr' }}
         />
 
-        {/* Elements Overlay */}
-        {elements.map(baseElement => {
+        {/* Unrendered Skeleton / Placeholder */}
+        {!isVisible && (
+          <div className="flex flex-col items-center justify-center text-gray-400 select-none animate-pulse" dir="ltr">
+            <FileText size={48} strokeWidth={1.5} className="text-gray-300 mb-2" />
+            <span className="text-sm font-semibold text-gray-600">Page {page.pageIndex + 1}</span>
+            <span className="text-xs text-gray-400 mt-1">Scroll to view</span>
+          </div>
+        )}
+
+        {/* Render Spinner overlay */}
+        {isVisible && isRendering && (
+          <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] flex items-center justify-center z-10" dir="ltr">
+            <Loader2 size={32} className="text-blue-600 animate-spin" />
+          </div>
+        )}
+
+        {/* Elements Overlay - Enforce LTR positioning */}
+        {isVisible && elements.map(baseElement => {
           const element = getDisplayProps(baseElement);
           const isSelected = selectedElement?.id === element.id;
 
@@ -324,42 +415,47 @@ const PDFViewer = ({
             <div
               key={element.id}
               className={`absolute select-none group ${isSelected ? 'z-20' : 'z-10'}`}
+              dir="ltr"
               style={{
-                left: `${(element.x / canvasRef.current?.width) * 100}%`,
-                top: `${(element.y / canvasRef.current?.height) * 100}%`,
-                width: `${(element.width / canvasRef.current?.width) * 100}%`,
-                height: `${(element.height / canvasRef.current?.height) * 100}%`,
-                pointerEvents: 'none' // Allow click-through to parent for selection logic, handled via overlay/parent
+                direction: 'ltr',
+                left: `${(element.x / scaledWidth) * 100}%`,
+                top: `${(element.y / scaledHeight) * 100}%`,
+                width: `${(element.width / scaledWidth) * 100}%`,
+                height: `${(element.height / scaledHeight) * 100}%`,
+                pointerEvents: 'none'
               }}
             >
               {/* Element Container */}
               <div className={`w-full h-full relative ${isSelected ? 'ring-2 ring-blue-500 ring-offset-2 border border-blue-300 border-dashed' : ''}`}>
 
-                {element.type === 'text' ? (
-                  <div
-                    style={{
-                      // Structure: we render the text at its *original* captured size (baseWidth/baseHeight)
-                      // and then simple scale it to fit the current element bounds.
-                      // This ensures it behaves exactly like an image/vector object during resize.
-                      width: `${element.baseWidth}px`,
-                      height: `${element.baseHeight}px`,
-                      transform: `scale(${element.width / element.baseWidth}, ${element.height / element.baseHeight})`,
-                      transformOrigin: 'top left',
-                      fontSize: `${element.baseFontSize}px`,
-                      fontFamily: 'Inter, system-ui, sans-serif',
-                      lineHeight: '1.2',
-                      color: element.color,
-                      padding: '10px',
-                      whiteSpace: 'pre-wrap',
-                      display: 'flex',
-                      alignItems: 'flex-start', // Top aligned usually
-                      justifyContent: 'flex-start',
-                    }}
-                    className="leading-tight font-sans"
-                  >
-                    {element.text}
-                  </div>
-                ) : (
+                {element.type === 'text' ? (() => {
+                  const isHebrew = /[\u0590-\u05FF]/.test(element.text || '');
+                  return (
+                    <div
+                      style={{
+                        width: `${element.baseWidth}px`,
+                        height: `${element.baseHeight}px`,
+                        transform: `scale(${element.width / element.baseWidth}, ${element.height / element.baseHeight})`,
+                        transformOrigin: 'top left',
+                        fontSize: `${element.baseFontSize}px`,
+                        fontFamily: element.fontFamilyCss || 'Heebo, Rubik, Arial, sans-serif',
+                        lineHeight: '1.2',
+                        color: element.color,
+                        padding: '10px',
+                        whiteSpace: 'pre-wrap',
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        justifyContent: isHebrew ? 'flex-end' : 'flex-start',
+                        direction: isHebrew ? 'rtl' : 'ltr',
+                        textAlign: isHebrew ? 'right' : 'left',
+                        unicodeBidi: 'plaintext'
+                      }}
+                      className="leading-tight font-sans"
+                    >
+                      {element.text}
+                    </div>
+                  );
+                })() : (
                   <img
                     src={element.dataUrl}
                     alt={element.type}
@@ -371,25 +467,21 @@ const PDFViewer = ({
               {/* Resize Handles (Only for selected) */}
               {isSelected && (
                 <>
-                  {/* NW */}
                   <div className="absolute -top-2 -left-2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md z-30 cursor-nw-resize" style={{ pointerEvents: 'auto' }} />
-                  {/* NE */}
                   <div className="absolute -top-2 -right-2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md z-30 cursor-ne-resize" style={{ pointerEvents: 'auto' }} />
-                  {/* SW */}
                   <div className="absolute -bottom-2 -left-2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md z-30 cursor-sw-resize" style={{ pointerEvents: 'auto' }} />
-                  {/* SE */}
                   <div className="absolute -bottom-2 -right-2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md z-30 cursor-se-resize" style={{ pointerEvents: 'auto' }} />
                 </>
               )}
             </div>
-          )
+          );
         })}
       </div>
 
       {/* Instructions */}
-      <div className="mt-4 text-xs text-center text-gray-500 font-medium">
-        {tool === 'move' && "Click an element to select it • Drag blue corners to resize • Drag the element to move"}
-        {tool !== 'move' && `Click on page to place ${tool} • Switch to 'Move' tool to resize`}
+      <div className="mt-4 text-xs text-center text-gray-500 font-medium" dir="rtl">
+        {tool === 'move' && "לחץ על רכיב כדי לבחור אותו • גרירת פינות כחולות לשינוי גודל • גרירת הרכיב להזזה"}
+        {tool !== 'move' && `לחץ על העמוד למיקום ${tool === 'text' ? 'טקסט' : 'חתימה'} • עבור לכלי 'הזזה' לשינוי גודל`}
       </div>
     </div>
   );

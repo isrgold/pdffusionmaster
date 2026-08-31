@@ -1,15 +1,14 @@
-
 // PDFEditor.jsx - Main component
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, CheckCircle } from 'lucide-react';
-import { DndContext, closestCenter } from '@dnd-kit/core';
-import { arrayMove, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { Upload, CheckCircle, ShieldCheck, Sparkles, PenTool, FileText, Layers } from 'lucide-react';
 import Toolbar from './components/Toolbar';
 import PDFViewer from './components/PDFViewer';
 import PageManager from './components/PageManager';
 import TextModal from './components/TextModal';
 import SignatureModal from './components/SignatureModal/SignatureModal';
-import { loadPDFLibraries, renderPageThumbnail, getPdfJs } from './utils/pdfUtils';
+import Header from './components/Header';
+import Logo from './components/Logo';
+import { loadPDFLibraries, getPdfJs } from './utils/pdfUtils';
 import { downloadPDF } from './utils/downloadUtils';
 
 const PDFEditor = () => {
@@ -21,7 +20,7 @@ const PDFEditor = () => {
 
   // Interaction states
   const [tool, setTool] = useState('move');
-  const [elements, setElements] = useState([]); // elements now use pageId instead of page index
+  const [elements, setElements] = useState([]);
   const [selectedElement, setSelectedElement] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -36,7 +35,6 @@ const PDFEditor = () => {
 
   // Refs
   const fileInputRef = useRef(null);
-  // We no longer need a single pdfDocRef as we manage multiple docs
 
   // Load PDF.js and PDF-lib
   useEffect(() => {
@@ -46,9 +44,9 @@ const PDFEditor = () => {
   // Intersection Observer for Current Page tracking
   useEffect(() => {
     const options = {
-      root: null, // Use the viewport
+      root: null,
       rootMargin: '0px',
-      threshold: 0.5 // Trigger when 50% of the page is visible
+      threshold: 0.5
     };
 
     const observer = new IntersectionObserver((entries) => {
@@ -62,7 +60,6 @@ const PDFEditor = () => {
       });
     }, options);
 
-    // Observe all page elements
     pages.forEach(page => {
       const element = document.getElementById(`page-${page.id}`);
       if (element) {
@@ -111,7 +108,7 @@ const PDFEditor = () => {
         });
 
         loadingTask.onPassword = (updatePassword, reason) => {
-          const password = prompt(reason === 1 ? 'Enter password:' : 'Wrong password, try again:');
+          const password = prompt(reason === 1 ? 'הכנס סיסמה:' : 'סיסמה שגויה, נסה שוב:');
           if (password) updatePassword(password);
         };
 
@@ -120,7 +117,8 @@ const PDFEditor = () => {
 
         for (let i = 1; i <= pdf.numPages; i++) {
           const page = await pdf.getPage(i);
-          // Skip initial thumbnail generation
+          const vp = page.getViewport({ scale: 1.0 });
+
           newPages.push({
             id: generateId(),
             pdfPage: page,
@@ -128,7 +126,10 @@ const PDFEditor = () => {
             pageIndex: i - 1,
             rotation: 0,
             fileName: file.name,
-            thumbnail: null // Will be loaded lazily
+            thumbnail: null,
+            aspectRatio: vp.width / vp.height,
+            originalWidth: vp.width,
+            originalHeight: vp.height
           });
         }
 
@@ -148,7 +149,7 @@ const PDFEditor = () => {
 
       } catch (error) {
         console.error('Error loading PDF:', error);
-        alert(`Error loading ${file.name}`);
+        alert(`שגיאה שטעינת הקובץ ${file.name}`);
       }
     }
   };
@@ -160,14 +161,8 @@ const PDFEditor = () => {
   };
 
   const handleToolClick = (pos, pageId) => {
-    // Determine the page if not passed (though it should be passed from the specific PDFViewer)
-    // For now we rely on the caller passing it, or falling back to currentPageId if we are cautious
-    const targetPageId = pageId || currentPageId;
-
     if (tool === 'text') {
       setClickPosition(pos);
-      // We might need to store the targetPageId in a state if the modal doesn't capture it immediately?
-      // Actually, addElement uses currentPageId, so we MUST update currentPageId when clicking a page.
       if (pageId && pageId !== currentPageId) {
         setCurrentPageId(pageId);
       }
@@ -222,7 +217,6 @@ const PDFEditor = () => {
     const newElement = { ...element, pageId: currentPageId };
     setElements(prev => [...prev, newElement]);
 
-    // Auto-switch to move tool and select the new element
     setTool('move');
     setSelectedElement(newElement);
   };
@@ -239,26 +233,28 @@ const PDFEditor = () => {
     setElements(prev => prev.filter(el => el.pageId !== currentPageId));
   };
 
-  const handleDownloadPDF = async () => {
-    await downloadPDF({
-      documents,
-      pages,
-      elements,
-      setIsDownloading,
-      onSaveSuccess: () => {
-        setShowSaveSuccess(true);
-        setTimeout(() => setShowSaveSuccess(false), 3500);
-      }
-    });
+  const handleDownloadPDF = () => {
+    if (isDownloading) return;
+    setIsDownloading(true);
+    setTimeout(async () => {
+      await downloadPDF({
+        documents,
+        pages,
+        elements,
+        setIsDownloading,
+        onSaveSuccess: () => {
+          setShowSaveSuccess(true);
+          setTimeout(() => setShowSaveSuccess(false), 3500);
+        }
+      });
+    }, 20);
   };
 
-  // Page Management Handlers
   const handlePageSelect = (index) => {
     if (pages[index]) {
       const pageId = pages[index].id;
       setCurrentPageId(pageId);
 
-      // Scroll to the page
       const pageElement = document.getElementById(`page-${pageId}`);
       if (pageElement) {
         pageElement.scrollIntoView({ behavior: 'smooth' });
@@ -270,117 +266,171 @@ const PDFEditor = () => {
     return pages.findIndex(p => p.id === currentPageId);
   };
 
-  const currentPageObj = pages.find(p => p.id === currentPageId);
-
   return (
-    <div className="flex h-screen bg-gray-100 overflow-hidden relative">
-      {/* Sidebar - Page Manager (Floating) */}
-      {pages.length > 0 && showSidebar && (
-        <div className="absolute left-0 top-0 h-full w-80 bg-white/95 backdrop-blur shadow-2xl z-50 transition-transform duration-300 ease-in-out border-r border-gray-200">
-          <PageManager
-            pages={pages}
-            setPages={setPages}
-            selectedPageIndex={getCurrentPageIndex()}
-            onSelectPage={handlePageSelect}
-            onAddFiles={() => fileInputRef.current?.click()}
-            onClose={() => setShowSidebar(false)}
-            onUpdateThumbnail={updatePageThumbnail}
-          />
-        </div>
-      )}
+    <div className="flex flex-col h-screen bg-slate-100/80 overflow-hidden relative font-sans" dir="rtl">
+      {/* App Top Header Bar */}
+      <Header pageCount={pages.length} />
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".pdf"
-        multiple
-        onChange={handleFileUpload}
-        className="hidden"
-      />
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Sidebar - Page Manager (Floating Drawer) */}
+        {pages.length > 0 && showSidebar && (
+          <div className="absolute right-0 top-0 h-full w-80 bg-white/95 backdrop-blur-xl shadow-2xl z-50 transition-transform duration-300 ease-in-out border-l border-slate-200">
+            <PageManager
+              pages={pages}
+              setPages={setPages}
+              selectedPageIndex={getCurrentPageIndex()}
+              onSelectPage={handlePageSelect}
+              onAddFiles={() => fileInputRef.current?.click()}
+              onClose={() => setShowSidebar(false)}
+              onUpdateThumbnail={updatePageThumbnail}
+            />
+          </div>
+        )}
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0 relative">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf"
+          multiple
+          onChange={handleFileUpload}
+          className="hidden"
+        />
 
-        {/* Background Decorative Elements */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-400/10 rounded-full blur-[120px]" />
-          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-400/10 rounded-full blur-[120px]" />
-        </div>
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col min-w-0 relative overflow-auto">
 
-        <div className="flex-1 overflow-auto p-4 sm:p-8 relative flex justify-center z-10">
+          {/* Glowing Background Art */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute top-[-10%] right-[-10%] w-[45%] h-[45%] bg-blue-500/10 rounded-full blur-[140px]" />
+            <div className="absolute bottom-[-10%] left-[-10%] w-[45%] h-[45%] bg-indigo-500/10 rounded-full blur-[140px]" />
+          </div>
+
           {!pages.length ? (
-            <div className="flex flex-col items-center justify-center p-12 bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl border border-white/50 h-fit my-auto max-w-lg text-center transition-all duration-300 hover:shadow-2xl">
-              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl mb-8 shadow-inner">
-                <Upload className="text-blue-600" size={48} strokeWidth={1.5} />
+            /* Welcome / Upload Hero */
+            <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-12 relative z-10 max-w-4xl mx-auto text-center my-auto">
+              
+              {/* Large Animated Logo */}
+              <div className="mb-8 scale-110 sm:scale-125">
+                <Logo size="xl" showText={true} />
               </div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-3 tracking-tight">Upload PDF</h2>
-              <p className="text-gray-500 mb-8 max-w-sm leading-relaxed">
-                Unlock the full potential of your documents. Upload a PDF to start editing, signing, and organizing pages with ease.
+
+              {/* Title & Subtitle */}
+              <h1 className="text-3xl sm:text-5xl font-black text-slate-900 tracking-tight leading-tight mb-4 max-w-2xl">
+                עריכה, מיזוג וחתימה על <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 bg-clip-text text-transparent">PDF</span> ברמה מקצועית
+              </h1>
+              
+              <p className="text-slate-600 text-base sm:text-lg mb-8 max-w-xl leading-relaxed font-normal">
+                מערכת מתקדמת למיזוג מסמכים, סידור עמודים, הוספת טקסטים וחתימה אלקטרונית - במהירות שיא ובאבטחה מלאה <strong>ללא העלאה לשרת</strong>.
               </p>
-              <button
+
+              {/* Upload Dropzone Box */}
+              <div
                 onClick={() => fileInputRef.current?.click()}
-                className="group relative bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-2xl font-semibold shadow-lg shadow-blue-500/30 transition-all hover:scale-[1.02] active:scale-[0.98] overflow-hidden"
+                className="w-full max-w-xl bg-white/90 backdrop-blur-xl border-2 border-dashed border-blue-300 hover:border-blue-500 p-8 sm:p-10 rounded-3xl shadow-xl hover:shadow-2xl shadow-blue-500/10 transition-all cursor-pointer group flex flex-col items-center justify-center relative overflow-hidden"
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 to-indigo-400/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-                <span className="relative flex items-center gap-2">
-                  Choose PDF Files
-                  <Upload size={18} className="opacity-70" />
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-50/60 to-indigo-50/60 opacity-0 group-hover:opacity-100 transition-opacity" />
+                
+                <div className="relative bg-gradient-to-br from-blue-600 to-indigo-600 text-white p-5 rounded-2xl mb-4 shadow-lg shadow-blue-500/30 group-hover:scale-110 transition-transform">
+                  <Upload size={36} strokeWidth={2} />
+                </div>
+
+                <span className="relative text-xl font-bold text-slate-800 mb-1 group-hover:text-blue-600 transition-colors">
+                  לחץ כאן להעלאת קבצי PDF
                 </span>
-              </button>
+                <span className="relative text-sm text-slate-500">
+                  ניתן לבחור קובץ אחד או מספר קבצים למיזוג ועריכה
+                </span>
+              </div>
+
+              {/* Feature Cards Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-3xl mt-12 text-right">
+                <div className="bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex items-start gap-3">
+                  <div className="p-2.5 bg-emerald-100 text-emerald-600 rounded-xl shrink-0">
+                    <ShieldCheck size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm text-slate-900">פרטיות 100%</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">המידע נשאר במחשב שלך בלבד</p>
+                  </div>
+                </div>
+
+                <div className="bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex items-start gap-3">
+                  <div className="p-2.5 bg-blue-100 text-blue-600 rounded-xl shrink-0">
+                    <Sparkles size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm text-slate-900">ביצועים מהירים</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">טעינת Canvas מואצת אופליין</p>
+                  </div>
+                </div>
+
+                <div className="bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex items-start gap-3">
+                  <div className="p-2.5 bg-indigo-100 text-indigo-600 rounded-xl shrink-0">
+                    <PenTool size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm text-slate-900">חתימה ועריכה</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">חתימה אישית והוספת טקסטים</p>
+                  </div>
+                </div>
+              </div>
+
             </div>
           ) : (
-            <div className="flex flex-col items-center w-full">
-              <Toolbar
-                tool={tool}
-                setTool={setTool}
-                selectedElement={selectedElement}
-                deleteSelectedElement={deleteSelectedElement}
-                clearPageElements={clearPageElements}
-                downloadPDF={handleDownloadPDF}
-                onRotatePage={() => {
-                  if (currentPageId) {
-                    setPages(prev => prev.map(p =>
-                      p.id === currentPageId ? { ...p, rotation: (p.rotation + 90) % 360 } : p
-                    ));
-                  }
-                }}
-                hasElements={elements.length > 0 || pages.length > 0}
-                isDownloading={isDownloading}
-                showSidebar={showSidebar}
-                setShowSidebar={setShowSidebar}
-              />
+            /* Active PDF Workspace */
+            <div className="flex-1 overflow-auto p-4 sm:p-8 relative flex justify-center z-10">
+              <div className="flex flex-col items-center w-full">
+                <Toolbar
+                  tool={tool}
+                  setTool={setTool}
+                  selectedElement={selectedElement}
+                  deleteSelectedElement={deleteSelectedElement}
+                  clearPageElements={clearPageElements}
+                  downloadPDF={handleDownloadPDF}
+                  onRotatePage={() => {
+                    if (currentPageId) {
+                      setPages(prev => prev.map(p =>
+                        p.id === currentPageId ? { ...p, rotation: (p.rotation + 90) % 360 } : p
+                      ));
+                    }
+                  }}
+                  hasElements={elements.length > 0 || pages.length > 0}
+                  isDownloading={isDownloading}
+                  showSidebar={showSidebar}
+                  setShowSidebar={setShowSidebar}
+                />
 
-              <div className="mt-20 w-fit max-w-full pb-20">
-                <div className="bg-white/95 backdrop-blur-sm shadow-2xl shadow-gray-900/10 rounded-xl overflow-hidden border border-gray-100 transition-all duration-300">
-                  <div className="flex flex-col gap-8 items-center py-8" id="pdf-scroll-container">
-                    {pages.map((page) => (
-                      <div
-                        key={page.id}
-                        id={`page-${page.id}`}
-                        className="relative shadow-lg"
-                        data-page-id={page.id}
-                      >
-                        <PDFViewer
-                          page={page}
-                          elements={elements.filter(e => e.pageId === page.id)}
-                          selectedElement={selectedElement}
-                          tool={tool}
-                          onToolClick={(pos) => {
-                            // We need to ensure we know which page was clicked
-                            setCurrentPageId(page.id);
-                            handleToolClick(pos, page.id);
-                          }}
-                          onElementSelect={handleElementSelect}
-                          onElementMove={handleElementMove}
-                          onElementResize={handleElementResize}
-                          onElementRelease={handleElementRelease}
-                        />
-                        {/* Page Number Indicator */}
-                        <div className="absolute top-2 right-[-40px] bg-gray-500 text-white text-xs px-2 py-1 rounded">
-                          {page.pageIndex + 1}
+                <div className="mt-24 w-fit max-w-full pb-20">
+                  <div className="bg-white/95 backdrop-blur-sm shadow-2xl shadow-slate-900/10 rounded-2xl overflow-hidden border border-slate-200/80 transition-all duration-300">
+                    <div className="flex flex-col gap-8 items-center py-8" id="pdf-scroll-container" dir="ltr" style={{ direction: 'ltr' }}>
+                      {pages.map((page) => (
+                        <div
+                          key={page.id}
+                          id={`page-${page.id}`}
+                          className="relative shadow-lg rounded-lg"
+                          data-page-id={page.id}
+                        >
+                          <PDFViewer
+                            page={page}
+                            elements={elements.filter(e => e.pageId === page.id)}
+                            selectedElement={selectedElement}
+                            tool={tool}
+                            onToolClick={(pos) => {
+                              setCurrentPageId(page.id);
+                              handleToolClick(pos, page.id);
+                            }}
+                            onElementSelect={handleElementSelect}
+                            onElementMove={handleElementMove}
+                            onElementResize={handleElementResize}
+                            onElementRelease={handleElementRelease}
+                          />
+                          {/* Page Number Badge */}
+                          <div className="absolute top-3 left-[-44px] bg-slate-800 text-white text-xs font-bold px-2.5 py-1 rounded-lg shadow-md">
+                            {page.pageIndex + 1}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
