@@ -198,28 +198,45 @@ export const compressImageForStorage = (img, maxDim = 400) => {
     };
 };
 
-export const safeSaveToStorage = (key, sigData) => {
+import { encryptSignatureData, decryptSignatureData } from '../../utils/signatureCrypto';
+
+export const safeSaveToStorage = async (key, sigData) => {
     try {
-        localStorage.setItem(key, JSON.stringify(sigData));
+        const encryptedPayload = await encryptSignatureData(sigData);
+        localStorage.setItem(key, JSON.stringify(encryptedPayload));
         return true;
     } catch (e) {
-        console.error("Storage quota exceeded", e);
-        alert("אחסון הדפדפן מלא (QuotaExceededError). מחק חתימות ישנות כדי לפנות מקום.");
+        console.error("Storage error", e);
+        alert("אחסון הדפדפן מלא (QuotaExceededError) או שמתרחשת שגיאת אחסון.");
         return false;
     }
 };
 
-export const loadSavedSignatures = () => {
-    return Object.keys(localStorage)
-        .filter(k => k.startsWith('signature_'))
-        .map(k => {
-            try {
-                return { key: k, ...JSON.parse(localStorage.getItem(k)) };
-            } catch {
-                return null;
+export const loadSavedSignatures = async () => {
+    const keys = Object.keys(localStorage).filter(k => k.startsWith('signature_'));
+    const list = [];
+    for (const k of keys) {
+        try {
+            const raw = localStorage.getItem(k);
+            if (!raw) continue;
+            const parsed = JSON.parse(raw);
+            if (parsed && !parsed.encrypted) {
+                // Legacy unencrypted signature: perform transparent auto-migration!
+                list.push({ key: k, ...parsed });
+                encryptSignatureData(parsed).then(encryptedObj => {
+                    localStorage.setItem(k, JSON.stringify(encryptedObj));
+                }).catch(err => console.warn('Auto-migration encryption failed:', err));
+            } else {
+                const decrypted = await decryptSignatureData(parsed);
+                if (decrypted) {
+                    list.push({ key: k, ...decrypted });
+                }
             }
-        })
-        .filter(Boolean);
+        } catch (e) {
+            console.warn('Failed to parse signature key:', k, e);
+        }
+    }
+    return list;
 };
 
 export const getMousePos = (e, canvasRef) => {

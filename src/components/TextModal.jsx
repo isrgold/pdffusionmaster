@@ -1,6 +1,6 @@
 // components/TextModal.jsx
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Check } from 'lucide-react';
+import { X, Check, FileText, Type, Palette } from 'lucide-react';
 
 export const FONT_OPTIONS = [
   { id: 'Heebo', label: 'היבו (Heebo) - נקי ומודרני', fontFamily: 'Heebo, sans-serif' },
@@ -12,9 +12,20 @@ export const FONT_OPTIONS = [
   { id: 'Courier Prime', label: 'קורייר (Courier) - מכונת כתיבה', fontFamily: "'Courier Prime', monospace" }
 ];
 
+const PRESET_COLORS = [
+  '#000000', // Black
+  '#1E3A8A', // Navy Blue
+  '#2563EB', // Royal Blue
+  '#DC2626', // Red
+  '#16A34A', // Green
+  '#4B5563', // Gray
+];
+
+const PRESET_SIZES = [14, 18, 24, 32, 48];
+
 const TextModal = ({ show, onClose, onSubmit, clickPosition }) => {
   const [textInput, setTextInput] = useState('');
-  const [fontSize, setFontSize] = useState(16);
+  const [fontSize, setFontSize] = useState(18);
   const [textColor, setTextColor] = useState('#000000');
   const [fontFamily, setFontFamily] = useState('Heebo');
 
@@ -111,19 +122,30 @@ const TextModal = ({ show, onClose, onSubmit, clickPosition }) => {
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4" dir="rtl">
-      <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 bg-slate-900/35 backdrop-blur-xs flex items-center justify-center z-50 p-4 font-sans" dir="rtl">
+      <div className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+        
+        {/* Modal Header */}
         <div className="flex justify-between items-center mb-5 pb-3 border-b border-slate-100">
-          <h3 className="text-lg font-bold text-slate-900">הוספת טקסט למסמך</h3>
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-blue-100 text-blue-600 rounded-xl">
+              <FileText size={18} />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900">הוספת טקסט למסמך</h3>
+              <p className="text-xs text-slate-500">הקלד את הטקסט והתאם גופן, גודל וצבע</p>
+            </div>
+          </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
+            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
         <div className="space-y-4">
+          {/* Text Area */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5">תוכן הטקסט</label>
             <textarea
@@ -131,7 +153,7 @@ const TextModal = ({ show, onClose, onSubmit, clickPosition }) => {
               onChange={(e) => setTextInput(e.target.value)}
               dir="auto"
               style={{ fontFamily: getSelectedFontFamily() }}
-              className="w-full border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl px-3.5 py-2.5 h-24 resize-none text-slate-800 leading-relaxed text-base transition-all"
+              className="w-full border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl px-3.5 py-2.5 h-24 resize-none text-slate-800 leading-relaxed text-base transition-all bg-slate-50/50 focus:bg-white"
               placeholder="הקלד כאן את הטקסט..."
               autoFocus
             />
@@ -143,7 +165,7 @@ const TextModal = ({ show, onClose, onSubmit, clickPosition }) => {
             <select
               value={fontFamily}
               onChange={(e) => setFontFamily(e.target.value)}
-              className="w-full border border-slate-300 focus:border-blue-500 rounded-xl px-3.5 py-2.5 text-slate-800 font-medium bg-white text-sm"
+              className="w-full border border-slate-300 focus:border-blue-500 rounded-xl px-3.5 py-2.5 text-slate-800 font-medium bg-white text-sm outline-none transition-all"
             >
               {FONT_OPTIONS.map(font => (
                 <option key={font.id} value={font.id}>
@@ -153,55 +175,116 @@ const TextModal = ({ show, onClose, onSubmit, clickPosition }) => {
             </select>
           </div>
 
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <label className="block text-xs font-bold text-slate-700 mb-1.5">גודל גופן (px)</label>
-              <input
-                type="number"
-                value={fontSize}
-                onChange={(e) => setFontSize(Number(e.target.value))}
-                className="w-full border border-slate-300 focus:border-blue-500 rounded-xl px-3.5 py-2 text-slate-800 font-medium"
-                min="8"
-                max="72"
-              />
-            </div>
-            <div className="flex-1">
-              <label className="block text-xs font-bold text-slate-700 mb-1.5">צבע טקסט</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={textColor}
-                  onChange={(e) => setTextColor(e.target.value)}
-                  className="w-full border border-slate-300 rounded-xl h-10 cursor-pointer p-1"
-                />
+          {/* Font Size & Presets */}
+          <div>
+            <div className="flex justify-between items-center mb-1.5">
+              <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                <Type size={14} className="text-slate-400" />
+                גודל גופן ({fontSize}px)
+              </label>
+              <div className="flex gap-1">
+                {PRESET_SIZES.map(size => (
+                  <button
+                    key={size}
+                    type="button"
+                    onClick={() => setFontSize(size)}
+                    className={`px-2 py-0.5 text-[11px] font-semibold rounded-md border transition-all ${
+                      fontSize === size
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                        : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                    }`}
+                  >
+                    {size}
+                  </button>
+                ))}
               </div>
+            </div>
+            <input
+              type="range"
+              min="10"
+              max="72"
+              value={fontSize}
+              onChange={(e) => setFontSize(Number(e.target.value))}
+              className="w-full accent-blue-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer"
+            />
+          </div>
+
+          {/* Color Selection & Swatches */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1">
+              <Palette size={14} className="text-slate-400" />
+              צבע טקסט
+            </label>
+            <div className="flex items-center gap-2">
+              <div className="flex gap-1.5 flex-1">
+                {PRESET_COLORS.map(c => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setTextColor(c)}
+                    style={{ backgroundColor: c }}
+                    className={`w-7 h-7 rounded-lg border transition-transform ${
+                      textColor.toLowerCase() === c.toLowerCase()
+                        ? 'ring-2 ring-blue-500 ring-offset-2 scale-110'
+                        : 'border-slate-300 hover:scale-105'
+                    }`}
+                  />
+                ))}
+              </div>
+              <input
+                type="color"
+                value={textColor}
+                onChange={(e) => setTextColor(e.target.value)}
+                className="w-9 h-8 border border-slate-300 rounded-lg cursor-pointer p-0.5 bg-white shrink-0"
+              />
             </div>
           </div>
 
-          {/* Preview */}
-          {textInput && (
-            <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/80">
-              <p className="text-xs font-bold text-slate-600 mb-2">תצוגה מקדימה:</p>
-              <div className="overflow-x-auto flex justify-center bg-white p-2 rounded-lg border border-slate-200">
-                <canvas ref={canvasRef} />
+          {/* Live Text Preview Box */}
+          {textInput ? (
+            <div className="border border-slate-200 rounded-xl p-3.5 bg-slate-50/80">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs font-bold text-slate-600">תצוגה מקדימה:</span>
+                <span className="text-[11px] text-slate-400 font-mono">{fontSize}px | {fontFamily}</span>
               </div>
+              <div className="overflow-x-auto flex justify-center items-center min-h-[60px] bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+                <div
+                  dir="auto"
+                  style={{
+                    fontFamily: getSelectedFontFamily(),
+                    fontSize: `${fontSize}px`,
+                    color: textColor,
+                    lineHeight: '1.2',
+                    wordBreak: 'break-word',
+                    textAlign: 'center'
+                  }}
+                  className="transition-all"
+                >
+                  {textInput}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="border border-dashed border-slate-200 rounded-xl p-4 text-center text-xs text-slate-400 bg-slate-50/40">
+              תצוגה מקדימה תופיע כאן ברגע שתקליד טקסט
             </div>
           )}
 
+          {/* Footer Actions */}
           <div className="flex gap-3 justify-end pt-3 border-t border-slate-100">
             <button
               onClick={onClose}
-              className="px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-semibold text-sm transition-all"
+              className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-medium text-xs transition-colors"
             >
               ביטול
             </button>
             <button
               onClick={handleSubmit}
               disabled={!textInput.trim()}
-              className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 disabled:opacity-40 font-bold text-sm shadow-md shadow-blue-500/20 flex items-center gap-2 transition-all active:scale-[0.98]"
+              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-xl font-medium text-xs shadow-xs disabled:opacity-40 flex items-center gap-2 transition-all"
             >
-              <Check size={18} strokeWidth={2.5} />
-              הוסף טקסט
+              <Check size={16} strokeWidth={2.5} />
+              הוסף למסמך
             </button>
           </div>
         </div>

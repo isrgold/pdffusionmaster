@@ -7,25 +7,25 @@ import { createSignaturePNG, loadSavedSignatures, compressImageForStorage, safeS
 
 // Modal Header Component
 const ModalHeader = ({ onClose, activeSection }) => (
-    <div className="flex-shrink-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-3 sm:p-4 md:p-6">
+    <div className="flex-shrink-0 bg-white border-b border-slate-200 p-4 sm:p-5" dir="rtl">
         <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-1.5 sm:p-2 bg-white bg-opacity-20 rounded-lg">
-                    <Sparkles size={16} className="sm:w-5 sm:h-5" />
+            <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 text-blue-600 rounded-xl">
+                    <FileSignature size={20} />
                 </div>
                 <div>
-                    <h3 className="text-sm sm:text-lg md:text-xl font-bold">Signature Manager</h3>
-                    <p className="text-blue-100 text-xs sm:text-sm hidden sm:block">
-                        {activeSection === 'saved' ? 'Use saved signatures' : 'Design your perfect signature'}
+                    <h3 className="text-lg font-bold text-slate-900">ניהול חתימות</h3>
+                    <p className="text-slate-500 text-xs hidden sm:block">
+                        {activeSection === 'saved' ? 'בחר מתוך חתימות שמורות' : 'עצב חתימה בכתב יד, טקסט מודפס או תמונת PNG'}
                     </p>
                 </div>
             </div>
             <button
                 onClick={onClose}
-                className="p-1.5 sm:p-2 hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors duration-200"
-                aria-label="Close modal"
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                aria-label="סגור חלון"
             >
-                <X size={16} className="sm:w-5 sm:h-5" />
+                <X size={18} />
             </button>
         </div>
     </div>
@@ -33,32 +33,32 @@ const ModalHeader = ({ onClose, activeSection }) => (
 
 // Section Tabs Component
 const SectionTabs = ({ activeSection, setActiveSection, savedSignatures }) => (
-    <div className="flex-shrink-0 bg-gray-50 border-b border-gray-200">
+    <div className="flex-shrink-0 bg-slate-50 border-b border-slate-200" dir="rtl">
         <div className="flex">
             <button
                 onClick={() => setActiveSection('saved')}
-                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 sm:px-4 sm:py-3 text-xs sm:text-sm font-medium transition-colors duration-200 ${activeSection === 'saved'
-                    ? 'bg-white text-blue-600 border-b-2 border-blue-600'
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-xs sm:text-sm font-semibold transition-all ${activeSection === 'saved'
+                    ? 'bg-white text-blue-600 border-b-2 border-blue-600 shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100/60'
                     }`}
             >
-                <FileSignature size={14} className="sm:w-4 sm:h-4" />
-                Saved Signatures
+                <FileSignature size={15} />
+                חתימות שמורות
                 {savedSignatures.length > 0 && (
-                    <span className="bg-blue-100 text-blue-600 text-xs px-1.5 sm:px-2 py-0.5 rounded-full">
+                    <span className="bg-blue-100 text-blue-600 text-xs px-2 py-0.5 rounded-full font-bold">
                         {savedSignatures.length}
                     </span>
                 )}
             </button>
             <button
                 onClick={() => setActiveSection('create')}
-                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 sm:px-4 sm:py-3 text-xs sm:text-sm font-medium transition-colors duration-200 ${activeSection === 'create'
-                    ? 'bg-white text-blue-600 border-b-2 border-blue-600'
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-xs sm:text-sm font-semibold transition-all ${activeSection === 'create'
+                    ? 'bg-white text-blue-600 border-b-2 border-blue-600 shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100/60'
                     }`}
             >
-                <Plus size={14} className="sm:w-4 sm:h-4" />
-                Create New
+                <Plus size={15} />
+                יצירת חתימה חדשה
             </button>
         </div>
     </div>
@@ -75,115 +75,66 @@ const ModalFooter = ({
     clearAll,
     hasContent,
 }) => (
-    <div className="flex-shrink-0 bg-gray-50 p-3 sm:p-4 md:p-6 border-t border-gray-200">
+    <div className="flex-shrink-0 bg-slate-50 p-4 border-t border-slate-200" dir="rtl">
         {activeSection === 'saved' ? (
             <div className="flex justify-between items-center">
                 <button
                     onClick={onClose}
-                    className="px-4 sm:px-6 py-2 text-gray-600 hover:bg-gray-200 rounded-lg transition-colors duration-200 text-sm sm:text-base"
+                    className="px-4 py-2 text-slate-600 hover:bg-slate-200/60 rounded-xl transition-colors text-xs font-medium"
                 >
-                    Cancel
+                    ביטול
                 </button>
                 <button
                     onClick={() => setActiveSection('create')}
-                    className="flex items-center gap-2 px-4 sm:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 text-sm sm:text-base"
+                    className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors text-xs font-semibold shadow-xs"
                 >
-                    <Plus size={14} className="sm:w-4 sm:h-4" />
-                    Create New Signature
+                    <Plus size={15} />
+                    צור חתימה חדשה
                 </button>
             </div>
         ) : (
-            <>
-                {/* Mobile: Stack buttons vertically */}
-                <div className="flex flex-col space-y-3 sm:hidden">
+            <div className="flex flex-wrap justify-between items-center gap-3">
+                <button
+                    onClick={clearAll}
+                    disabled={!hasContent}
+                    className="flex items-center gap-1.5 px-3 py-2 text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                    <Eraser size={15} />
+                    נקה הכל
+                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                    <button
+                        onClick={onClose}
+                        className="px-4 py-2 text-slate-600 hover:bg-slate-200/60 rounded-xl transition-colors text-xs font-medium"
+                    >
+                        ביטול
+                    </button>
+                    <button
+                        onClick={handleSavePNG}
+                        disabled={!hasContent}
+                        className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold"
+                    >
+                        <Download size={14} />
+                        הורד PNG
+                    </button>
+                    <button
+                        onClick={handleSaveToStorage}
+                        disabled={!hasContent}
+                        className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-200/70 hover:bg-slate-200 text-slate-800 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold"
+                    >
+                        <Save size={14} />
+                        שמור בדפדפן
+                    </button>
                     <button
                         onClick={handleSubmit}
                         disabled={!hasContent}
-                        className="flex items-center gap-2 justify-center px-4 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                        className="flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold shadow-xs"
                     >
-                        <Check size={16} />
-                        Add Signature
+                        <Check size={16} strokeWidth={2.5} />
+                        הוסף חתימה למסמך
                     </button>
-                    <div className="grid grid-cols-2 gap-3">
-                        <button
-                            onClick={handleSavePNG}
-                            disabled={!hasContent}
-                            className="flex items-center gap-2 justify-center px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-xs"
-                        >
-                            <Download size={14} />
-                            Download
-                        </button>
-                        <button
-                            onClick={handleSaveToStorage}
-                            disabled={!hasContent}
-                            className="flex items-center gap-2 justify-center px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-xs"
-                        >
-                            <Save size={14} />
-                            Save
-                        </button>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                        <button
-                            onClick={clearAll}
-                            disabled={!hasContent}
-                            className="flex items-center gap-2 justify-center px-3 py-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-xs border border-gray-300"
-                        >
-                            <Eraser size={14} />
-                            Clear
-                        </button>
-                        <button
-                            onClick={onClose}
-                            className="px-3 py-2 text-gray-600 hover:bg-gray-200 rounded-lg transition-colors duration-200 text-xs border border-gray-300"
-                        >
-                            Cancel
-                        </button>
-                    </div>
                 </div>
-
-                {/* Desktop: Horizontal layout */}
-                <div className="hidden sm:flex justify-between items-center">
-                    <button
-                        onClick={clearAll}
-                        disabled={!hasContent}
-                        className="flex items-center gap-2 justify-center px-4 py-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                    >
-                        <Eraser size={14} />
-                        Clear All
-                    </button>
-                    <div className="flex gap-2 sm:gap-3">
-                        <button
-                            onClick={onClose}
-                            className="px-4 sm:px-6 py-2 text-gray-600 hover:bg-gray-200 rounded-lg transition-colors duration-200 text-sm"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handleSavePNG}
-                            disabled={!hasContent}
-                            className="flex items-center gap-2 justify-center px-4 sm:px-6 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm transform hover:scale-105"
-                        >
-                            <Download size={14} />
-                            Download PNG
-                        </button>
-                        <button
-                            onClick={handleSaveToStorage}
-                            disabled={!hasContent}
-                            className="flex items-center gap-2 justify-center px-4 sm:px-6 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm transform hover:scale-105"
-                        >
-                            <Save size={14} />
-                            Save to Browser
-                        </button>
-                        <button
-                            onClick={handleSubmit}
-                            disabled={!hasContent}
-                            className="flex items-center gap-2 justify-center px-6 sm:px-8 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm transform hover:scale-105"
-                        >
-                            <Check size={14} />
-                            Add Signature
-                        </button>
-                    </div>
-                </div>
-            </>
+            </div>
         )}
     </div>
 );
@@ -203,9 +154,18 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
 
     const [backgroundImage, setBackgroundImage] = useState(null);
 
+    const refreshSavedSignatures = async () => {
+        try {
+            const sigs = await loadSavedSignatures();
+            setSavedSignatures(sigs);
+        } catch (err) {
+            console.error('Failed to load saved signatures:', err);
+        }
+    };
+
     useEffect(() => {
         if (show) {
-            setSavedSignatures(loadSavedSignatures());
+            refreshSavedSignatures();
             document.body.style.overflow = 'hidden';
             // Prevent zoom on iOS
             document.addEventListener('touchmove', preventZoom, { passive: false });
@@ -242,7 +202,7 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
         const reader = new FileReader();
         reader.onload = (e) => {
             const img = new Image();
-            img.onload = () => {
+            img.onload = async () => {
                 const compressed = compressImageForStorage(img, 400);
                 const key = `signature_${Date.now()}`;
                 const sigData = {
@@ -252,8 +212,9 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
                     name: file.name.replace(/\.[^/.]+$/, ""),
                     bg: compressed.dataUrl
                 };
-                if (safeSaveToStorage(key, sigData)) {
-                    setSavedSignatures(loadSavedSignatures());
+                const saved = await safeSaveToStorage(key, sigData);
+                if (saved) {
+                    await refreshSavedSignatures();
                     showSuccessMessage();
                 }
             };
@@ -271,7 +232,7 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
         const reader = new FileReader();
         reader.onload = (e) => {
             const img = new Image();
-            img.onload = () => {
+            img.onload = async () => {
                 setBackgroundImage(img);
                 const compressed = compressImageForStorage(img, 400);
                 const key = `signature_${Date.now()}`;
@@ -282,8 +243,9 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
                     name: file.name.replace(/\.[^/.]+$/, ""),
                     bg: compressed.dataUrl
                 };
-                if (safeSaveToStorage(key, sigData)) {
-                    setSavedSignatures(loadSavedSignatures());
+                const saved = await safeSaveToStorage(key, sigData);
+                if (saved) {
+                    await refreshSavedSignatures();
                     showSuccessMessage();
                 }
             };
@@ -322,7 +284,7 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
         showSuccessMessage();
     };
 
-    const handleSaveToStorage = () => {
+    const handleSaveToStorage = async () => {
         const signatureData = createSignaturePNG(signaturePaths, textElements, signatureColor, backgroundImage);
         if (!signatureData) return;
         const key = `signature_${Date.now()}`;
@@ -339,15 +301,16 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
             name: 'Saved Signature'
         };
 
-        if (safeSaveToStorage(key, fullState)) {
-            setSavedSignatures(loadSavedSignatures());
+        const saved = await safeSaveToStorage(key, fullState);
+        if (saved) {
+            await refreshSavedSignatures();
             showSuccessMessage();
         }
     };
 
-    const handleDeleteSavedSignature = (key) => {
+    const handleDeleteSavedSignature = async (key) => {
         localStorage.removeItem(key);
-        setSavedSignatures(loadSavedSignatures());
+        await refreshSavedSignatures();
     };
 
     const handleInsertSavedSignature = (sig) => {
@@ -407,9 +370,9 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
     const hasContent = signaturePaths.length > 0 || textElements.some((el) => el.text.length > 0) || backgroundImage;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 backdrop-blur-sm">
-            {/* Mobile: Full screen */}
-            <div className="bg-white w-full h-full sm:h-auto sm:rounded-2xl shadow-2xl sm:max-w-4xl sm:mx-auto sm:max-h-[90vh] overflow-hidden border-0 sm:border border-gray-200 flex flex-col">
+        <div className="fixed inset-0 bg-slate-900/35 backdrop-blur-xs flex items-center justify-center z-50 p-4 font-sans" dir="rtl">
+            {/* Mobile / Responsive Modal Container */}
+            <div className="bg-white w-full h-full sm:h-auto sm:rounded-2xl shadow-2xl sm:max-w-4xl sm:mx-auto sm:max-h-[90vh] overflow-hidden border border-slate-200 flex flex-col animate-in fade-in zoom-in-95 duration-200">
                 <ModalHeader onClose={onClose} activeSection={activeSection} />
                 <SectionTabs
                     activeSection={activeSection}
@@ -418,21 +381,22 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
                 />
                 <div className="flex-1 overflow-y-auto">
                     {activeSection === 'saved' ? (
-                        <div className="p-3 sm:p-4 md:p-6">
+                        <div className="p-4 sm:p-6">
                             {savedSignatures.length > 0 ? (
                                 <SavedSignatures
                                     savedSignatures={savedSignatures}
                                     onInsert={handleInsertSavedSignature}
                                     onDelete={handleDeleteSavedSignature}
                                     onUpload={handleUploadSignatureFile}
-                                    onRename={(key, newName) => {
+                                    onRename={async (key, newName) => {
                                         try {
                                             const item = localStorage.getItem(key);
                                             if (item) {
                                                 const data = JSON.parse(item);
                                                 data.name = newName;
                                                 localStorage.setItem(key, JSON.stringify(data));
-                                                setSavedSignatures(loadSavedSignatures());
+                                                const sigs = await loadSavedSignatures();
+                                                setSavedSignatures(sigs);
                                             }
                                         } catch (e) {
                                             console.error("Error renaming signature", e);
@@ -441,7 +405,7 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
                                     onEdit={handleEditSavedSignature}
                                 />
                             ) : (
-                                <div className="text-center py-8 sm:py-12">
+                                <div className="text-center py-10 sm:py-14 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200 my-2">
                                     <input
                                         type="file"
                                         ref={emptyFileInputRef}
@@ -452,25 +416,27 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
                                             e.target.value = null;
                                         }}
                                     />
-                                    <div className="mx-auto w-12 sm:w-16 h-12 sm:h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                                        <FileSignature size={20} className="sm:w-6 sm:h-6 text-gray-400" />
+                                    <div className="mx-auto w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-3">
+                                        <FileSignature size={24} />
                                     </div>
-                                    <h4 className="text-base sm:text-lg font-medium text-gray-900 mb-2">No saved signatures</h4>
-                                    <p className="text-gray-500 text-sm mb-4 sm:mb-6">Upload an existing PNG image or draw/type a new signature</p>
-                                    <div className="flex flex-wrap justify-center items-center gap-3">
+                                    <h4 className="text-base font-bold text-slate-800 mb-1">אין חתימות שמורות</h4>
+                                    <p className="text-slate-500 text-xs mb-5 max-w-xs mx-auto">תוכל להעלות קובץ תמונה בפורמט PNG או לעצב חתימה חדשה בכתב יד / טקסט</p>
+                                    <div className="flex flex-wrap justify-center items-center gap-2.5">
                                         <button
+                                            type="button"
                                             onClick={() => emptyFileInputRef.current?.click()}
-                                            className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors duration-200 text-sm font-medium shadow-sm"
+                                            className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 rounded-xl transition-colors text-xs font-semibold"
                                         >
-                                            <Upload size={16} />
-                                            Upload PNG / Image
+                                            <Upload size={14} />
+                                            העלאת תמונת PNG
                                         </button>
                                         <button
+                                            type="button"
                                             onClick={() => setActiveSection('create')}
-                                            className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 text-sm font-medium shadow-sm"
+                                            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors text-xs font-semibold shadow-xs"
                                         >
-                                            <Plus size={16} />
-                                            Create Signature
+                                            <Plus size={14} />
+                                            צור חתימה חדשה
                                         </button>
                                     </div>
                                 </div>

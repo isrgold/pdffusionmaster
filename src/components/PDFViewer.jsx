@@ -167,39 +167,21 @@ const PDFViewer = ({
       });
   };
 
-  const getResizeHandleAt = (pos, element) => {
-    if (!element) return null;
+  const handleHandleMouseDown = (e, element, handleKey) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const pos = getMousePos(e);
+    onElementSelect(element, pos);
 
-    const canvas = canvasRef.current;
-    const rect = canvas ? canvas.getBoundingClientRect() : containerRef.current.getBoundingClientRect();
-
-    const scaleX = scaledWidth / rect.width;
-    const scaleY = scaledHeight / rect.height;
-
-    const screenHandleSize = 24;
-    const handleWidth = screenHandleSize * scaleX;
-    const handleHeight = screenHandleSize * scaleY;
-
-    let elX = element.x;
-    let elY = element.y;
-    let elW = element.width;
-    let elH = element.height;
-
-    const handles = {
-      nw: { x: elX, y: elY },
-      ne: { x: elX + elW, y: elY },
-      sw: { x: elX, y: elY + elH },
-      se: { x: elX + elW, y: elY + elH },
-    };
-
-    for (const handle in handles) {
-      const h = handles[handle];
-      if (pos.x >= h.x - handleWidth / 2 && pos.x <= h.x + handleWidth / 2 &&
-        pos.y >= h.y - handleHeight / 2 && pos.y <= h.y + handleHeight / 2) {
-        return handle;
-      }
-    }
-    return null;
+    setInteractionState({
+      type: 'resize',
+      handle: handleKey,
+      startX: pos.x,
+      startY: pos.y,
+      initialEl: { ...element },
+      deltaX: 0,
+      deltaY: 0
+    });
   };
 
   const handleCanvasMouseDown = (e) => {
@@ -213,11 +195,10 @@ const PDFViewer = ({
 
       if (clickedElement) {
         onElementSelect(clickedElement, pos);
-        const handle = getResizeHandleAt(pos, clickedElement);
 
         setInteractionState({
-          type: handle ? 'resize' : 'move',
-          handle: handle,
+          type: 'move',
+          handle: null,
           startX: pos.x,
           startY: pos.y,
           initialEl: { ...clickedElement },
@@ -236,29 +217,15 @@ const PDFViewer = ({
       const deltaX = pos.x - interactionState.startX;
       const deltaY = pos.y - interactionState.startY;
 
-      setInteractionState(prev => ({
+      setInteractionState(prev => prev ? ({
         ...prev,
         deltaX,
         deltaY
-      }));
+      }) : null);
       return;
     }
 
     if (tool === 'move') {
-      if (selectedElement) {
-        const handle = getResizeHandleAt(pos, selectedElement);
-        if (handle && canvasRef.current) {
-          const cursorMap = {
-            nw: 'nw-resize',
-            ne: 'ne-resize',
-            sw: 'sw-resize',
-            se: 'se-resize'
-          };
-          canvasRef.current.style.cursor = cursorMap[handle];
-          return;
-        }
-      }
-
       if (getElementAt(pos)) {
         if (canvasRef.current) canvasRef.current.style.cursor = 'move';
       } else {
@@ -308,6 +275,34 @@ const PDFViewer = ({
       setInteractionState(null);
     }
   };
+
+  useEffect(() => {
+    if (!interactionState) return;
+
+    const handleWindowMouseMove = (e) => {
+      const pos = getMousePos(e);
+      const deltaX = pos.x - interactionState.startX;
+      const deltaY = pos.y - interactionState.startY;
+
+      setInteractionState(prev => prev ? ({
+        ...prev,
+        deltaX,
+        deltaY
+      }) : null);
+    };
+
+    const handleWindowMouseUp = () => {
+      handleMouseUp();
+    };
+
+    window.addEventListener('mousemove', handleWindowMouseMove);
+    window.addEventListener('mouseup', handleWindowMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleWindowMouseMove);
+      window.removeEventListener('mouseup', handleWindowMouseUp);
+    };
+  }, [interactionState]);
 
   const getCursorStyle = () => {
     switch (tool) {
@@ -463,10 +458,26 @@ const PDFViewer = ({
               {/* Resize Handles (Only for selected) */}
               {isSelected && (
                 <>
-                  <div className="absolute -top-2 -left-2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md z-30 cursor-nw-resize" style={{ pointerEvents: 'auto' }} />
-                  <div className="absolute -top-2 -right-2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md z-30 cursor-ne-resize" style={{ pointerEvents: 'auto' }} />
-                  <div className="absolute -bottom-2 -left-2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md z-30 cursor-sw-resize" style={{ pointerEvents: 'auto' }} />
-                  <div className="absolute -bottom-2 -right-2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md z-30 cursor-se-resize" style={{ pointerEvents: 'auto' }} />
+                  <div
+                    className="absolute -top-2.5 -left-2.5 w-5 h-5 bg-blue-600 border-2 border-white rounded-full shadow-md z-30 cursor-nw-resize hover:scale-125 transition-transform"
+                    style={{ pointerEvents: 'auto' }}
+                    onMouseDown={(e) => handleHandleMouseDown(e, element, 'nw')}
+                  />
+                  <div
+                    className="absolute -top-2.5 -right-2.5 w-5 h-5 bg-blue-600 border-2 border-white rounded-full shadow-md z-30 cursor-ne-resize hover:scale-125 transition-transform"
+                    style={{ pointerEvents: 'auto' }}
+                    onMouseDown={(e) => handleHandleMouseDown(e, element, 'ne')}
+                  />
+                  <div
+                    className="absolute -bottom-2.5 -left-2.5 w-5 h-5 bg-blue-600 border-2 border-white rounded-full shadow-md z-30 cursor-sw-resize hover:scale-125 transition-transform"
+                    style={{ pointerEvents: 'auto' }}
+                    onMouseDown={(e) => handleHandleMouseDown(e, element, 'sw')}
+                  />
+                  <div
+                    className="absolute -bottom-2.5 -right-2.5 w-5 h-5 bg-blue-600 border-2 border-white rounded-full shadow-md z-30 cursor-se-resize hover:scale-125 transition-transform"
+                    style={{ pointerEvents: 'auto' }}
+                    onMouseDown={(e) => handleHandleMouseDown(e, element, 'se')}
+                  />
                 </>
               )}
             </div>
