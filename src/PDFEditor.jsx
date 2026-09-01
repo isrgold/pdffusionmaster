@@ -1,6 +1,6 @@
 // PDFEditor.jsx - Main component
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, CheckCircle, ShieldCheck, Sparkles, PenTool, FileText, Layers } from 'lucide-react';
+import { Upload, CheckCircle } from 'lucide-react';
 import Toolbar from './components/Toolbar';
 import PDFViewer from './components/PDFViewer';
 import PageManager from './components/PageManager';
@@ -27,6 +27,7 @@ const PDFEditor = () => {
   const [isDownloading, setIsDownloading] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   // Modal states
   const [showTextModal, setShowTextModal] = useState(false);
@@ -151,6 +152,30 @@ const PDFEditor = () => {
         console.error('Error loading PDF:', error);
         alert(`שגיאה שטעינת הקובץ ${file.name}`);
       }
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDragOver) setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+    const droppedFiles = Array.from(e.dataTransfer.files).filter(
+      f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')
+    );
+    if (droppedFiles.length > 0) {
+      handleFileUpload({ target: { files: droppedFiles } });
     }
   };
 
@@ -306,73 +331,57 @@ const PDFEditor = () => {
           </div>
 
           {!pages.length ? (
-            /* Welcome / Upload Hero */
-            <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-12 relative z-10 max-w-4xl mx-auto text-center my-auto">
+            /* Clean Minimalist Application Workspace Upload */
+            <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-12 relative z-10 max-w-3xl mx-auto text-center my-auto">
               
-              {/* Large Animated Logo */}
-              <div className="mb-8 scale-110 sm:scale-125">
-                <Logo size="xl" showText={true} />
+              {/* Clean App Logo & Header */}
+              <div className="mb-6 flex flex-col items-center">
+                <Logo size="lg" showText={true} />
               </div>
 
               {/* Title & Subtitle */}
-              <h1 className="text-3xl sm:text-5xl font-black text-slate-900 tracking-tight leading-tight mb-4 max-w-2xl">
-                עריכה, מיזוג וחתימה על <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 bg-clip-text text-transparent">PDF</span> ברמה מקצועית
+              <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight mb-2">
+                עריכה, מיזוג וחתימה על מסמכי PDF
               </h1>
               
-              <p className="text-slate-600 text-base sm:text-lg mb-8 max-w-xl leading-relaxed font-normal">
-                מערכת מתקדמת למיזוג מסמכים, סידור עמודים, הוספת טקסטים וחתימה אלקטרונית - במהירות שיא ובאבטחה מלאה <strong>ללא העלאה לשרת</strong>.
+              <p className="text-slate-500 text-sm sm:text-base mb-8 max-w-md">
+                בחר קבצים מהמחשב או גרור אותם ישירות לכאן כדי להתחיל
               </p>
 
-              {/* Upload Dropzone Box */}
+              {/* Professional Upload Dropzone Box */}
               <div
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full max-w-xl bg-white/90 backdrop-blur-xl border-2 border-dashed border-blue-300 hover:border-blue-500 p-8 sm:p-10 rounded-3xl shadow-xl hover:shadow-2xl shadow-blue-500/10 transition-all cursor-pointer group flex flex-col items-center justify-center relative overflow-hidden"
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={`w-full max-w-lg p-10 rounded-2xl border-2 border-dashed transition-all duration-200 cursor-pointer flex flex-col items-center justify-center relative bg-white shadow-xs ${
+                  isDragOver
+                    ? 'border-blue-500 bg-blue-50/40 shadow-md scale-[1.01]'
+                    : 'border-slate-300 hover:border-slate-400 hover:bg-slate-50/50'
+                }`}
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-50/60 to-indigo-50/60 opacity-0 group-hover:opacity-100 transition-opacity" />
-                
-                <div className="relative bg-gradient-to-br from-blue-600 to-indigo-600 text-white p-5 rounded-2xl mb-4 shadow-lg shadow-blue-500/30 group-hover:scale-110 transition-transform">
-                  <Upload size={36} strokeWidth={2} />
+                <div className={`p-4 rounded-full mb-4 transition-colors ${isDragOver ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-600'}`}>
+                  <Upload size={28} strokeWidth={1.75} />
                 </div>
 
-                <span className="relative text-xl font-bold text-slate-800 mb-1 group-hover:text-blue-600 transition-colors">
-                  לחץ כאן להעלאת קבצי PDF
-                </span>
-                <span className="relative text-sm text-slate-500">
-                  ניתן לבחור קובץ אחד או מספר קבצים למיזוג ועריכה
-                </span>
+                <div className="flex flex-col items-center gap-2">
+                  <button
+                    type="button"
+                    className="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-medium text-sm px-6 py-2.5 rounded-xl transition-colors shadow-xs"
+                  >
+                    בחירת קבצים מהמחשב
+                  </button>
+                  <span className="text-xs text-slate-400 mt-2">
+                    או גרור קבצי PDF ישירות לכאן
+                  </span>
+                </div>
               </div>
 
-              {/* Feature Cards Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-3xl mt-12 text-right">
-                <div className="bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex items-start gap-3">
-                  <div className="p-2.5 bg-emerald-100 text-emerald-600 rounded-xl shrink-0">
-                    <ShieldCheck size={20} />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-sm text-slate-900">פרטיות 100%</h3>
-                    <p className="text-xs text-slate-500 mt-0.5">המידע נשאר במחשב שלך בלבד</p>
-                  </div>
-                </div>
-
-                <div className="bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex items-start gap-3">
-                  <div className="p-2.5 bg-blue-100 text-blue-600 rounded-xl shrink-0">
-                    <Sparkles size={20} />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-sm text-slate-900">ביצועים מהירים</h3>
-                    <p className="text-xs text-slate-500 mt-0.5">טעינת Canvas מואצת אופליין</p>
-                  </div>
-                </div>
-
-                <div className="bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex items-start gap-3">
-                  <div className="p-2.5 bg-indigo-100 text-indigo-600 rounded-xl shrink-0">
-                    <PenTool size={20} />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-sm text-slate-900">חתימה ועריכה</h3>
-                    <p className="text-xs text-slate-500 mt-0.5">חתימה אישית והוספת טקסטים</p>
-                  </div>
-                </div>
+              {/* Supported formats info */}
+              <div className="mt-8 text-xs text-slate-400 flex items-center justify-center gap-4">
+                <span>תומך בפורמט PDF</span>
+                <span>•</span>
+                <span>בחירת קבצים מרובים למיזוג</span>
               </div>
 
             </div>

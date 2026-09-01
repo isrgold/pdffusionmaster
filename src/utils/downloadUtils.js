@@ -116,7 +116,7 @@ export const downloadPDF = async ({
             switch (rotationMode) {
               case 90:
                 pdfX = cropX + elY;
-                pdfY = cropY + elX;
+                pdfY = cropY + elX + elWidth;
                 pdfW = elWidth;
                 pdfH = elHeight;
                 rotateDegrees = -90;
@@ -124,7 +124,7 @@ export const downloadPDF = async ({
 
               case 180:
                 pdfX = cropX + cropWidth - elX;
-                pdfY = cropY + cropHeight - elY;
+                pdfY = cropY + elY + elHeight;
                 pdfW = elWidth;
                 pdfH = elHeight;
                 rotateDegrees = 180;
@@ -132,7 +132,7 @@ export const downloadPDF = async ({
 
               case 270:
                 pdfX = cropX + cropWidth - elY;
-                pdfY = cropY + elX;
+                pdfY = cropY + cropHeight - elX - elWidth;
                 pdfW = elWidth;
                 pdfH = elHeight;
                 rotateDegrees = 90;

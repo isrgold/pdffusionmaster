@@ -146,18 +146,14 @@ const PDFViewer = ({
   };
 
   const getMousePos = (e) => {
-    const canvas = canvasRef.current;
-    if (!canvas || canvas.width === 0 || canvas.height === 0) {
-      const rect = containerRef.current.getBoundingClientRect();
-      return {
-        x: (e.clientX - rect.left) * (scaledWidth / rect.width),
-        y: (e.clientY - rect.top) * (scaledHeight / rect.height)
-      };
-    }
-    const rect = canvas.getBoundingClientRect();
+    const container = containerRef.current;
+    if (!container) return { x: 0, y: 0 };
+    const rect = container.getBoundingClientRect();
+    const rawX = (e.clientX - rect.left) * (scaledWidth / rect.width);
+    const rawY = (e.clientY - rect.top) * (scaledHeight / rect.height);
     return {
-      x: (e.clientX - rect.left) * (canvas.width / rect.width),
-      y: (e.clientY - rect.top) * (canvas.height / rect.height)
+      x: Math.max(0, Math.min(scaledWidth, rawX)),
+      y: Math.max(0, Math.min(scaledHeight, rawY))
     };
   };
 
@@ -459,7 +455,7 @@ const PDFViewer = ({
                   <img
                     src={element.dataUrl}
                     alt={element.type}
-                    className="w-full h-full object-contain"
+                    className="w-full h-full object-fill pointer-events-none"
                   />
                 )}
               </div>
