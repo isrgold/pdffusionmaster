@@ -1,6 +1,6 @@
 // PDFEditor.jsx - Main component
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, CheckCircle } from 'lucide-react';
+import { Upload, CheckCircle, Lock } from 'lucide-react';
 import Toolbar from './components/Toolbar';
 import PDFViewer from './components/PDFViewer';
 import PageManager from './components/PageManager';
@@ -8,6 +8,8 @@ import TextModal from './components/TextModal';
 import SignatureModal from './components/SignatureModal/SignatureModal';
 import Header from './components/Header';
 import Logo from './components/Logo';
+import DecryptModal from './components/DecryptModal';
+import { isEncrypted, decryptPDF } from '@pdfsmaller/pdf-decrypt';
 import { loadPDFLibraries, getPdfJs } from './utils/pdfUtils';
 import { downloadPDF } from './utils/downloadUtils';
 
@@ -33,6 +35,8 @@ const PDFEditor = () => {
   const [showTextModal, setShowTextModal] = useState(false);
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [clickPosition, setClickPosition] = useState({ x: 0, y: 0 });
+  const [pendingEncryptedFile, setPendingEncryptedFile] = useState(null);
+  const [decryptError, setDecryptError] = useState('');
 
   // Refs
   const fileInputRef = useRef(null);
@@ -91,16 +95,54 @@ const PDFEditor = () => {
 
   const generateId = () => Math.random().toString(36).substr(2, 9);
 
+  const requestDecryption = (fileName, pdfBytes) => {
+    return new Promise((resolve) => {
+      setDecryptError('');
+      setPendingEncryptedFile({ fileName, pdfBytes, resolve });
+    });
+  };
+
+  const handleDecryptSubmit = async (password) => {
+    if (!pendingEncryptedFile) return;
+    setDecryptError('');
+    try {
+      const decrypted = await decryptPDF(pendingEncryptedFile.pdfBytes, password);
+      pendingEncryptedFile.resolve(decrypted);
+      setPendingEncryptedFile(null);
+    } catch (err) {
+      console.error('Decryption error:', err);
+      setDecryptError('סיסמה שגויה או סוג הצפנה שאינו נתמך');
+    }
+  };
+
+  const handleDecryptCancel = () => {
+    if (pendingEncryptedFile) {
+      pendingEncryptedFile.resolve(null);
+      setPendingEncryptedFile(null);
+    }
+  };
+
   const handleFileUpload = async (event) => {
     const files = Array.from(event.target.files);
     if (!files.length) return;
 
     for (const file of files) {
-      if (file.type !== 'application/pdf') continue;
+      if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) continue;
 
       const arrayBuffer = await file.arrayBuffer();
-      const pdfBytes = new Uint8Array(arrayBuffer);
+      let pdfBytes = new Uint8Array(arrayBuffer);
       const docId = generateId();
+
+      try {
+        const encInfo = await isEncrypted(pdfBytes);
+        if (encInfo && encInfo.encrypted) {
+          const decryptedBytes = await requestDecryption(file.name, pdfBytes);
+          if (!decryptedBytes) continue;
+          pdfBytes = decryptedBytes;
+        }
+      } catch (e) {
+        console.warn('isEncrypted check warning:', e);
+      }
 
       try {
         const pdfjsLib = await getPdfJs();
@@ -150,7 +192,7 @@ const PDFEditor = () => {
 
       } catch (error) {
         console.error('Error loading PDF:', error);
-        alert(`שגיאה שטעינת הקובץ ${file.name}`);
+        alert(`שגיאה בטעינת הקובץ ${file.name}`);
       }
     }
   };
@@ -378,10 +420,15 @@ const PDFEditor = () => {
               </div>
 
               {/* Supported formats info */}
-              <div className="mt-8 text-xs text-slate-400 flex items-center justify-center gap-4">
+              <div className="mt-8 text-xs text-slate-400 flex flex-wrap items-center justify-center gap-3 sm:gap-4">
                 <span>תומך בפורמט PDF</span>
                 <span>•</span>
-                <span>בחירת קבצים מרובים למיזוג</span>
+                <span>מיזוג קבצים מרובים</span>
+                <span>•</span>
+                <span className="flex items-center gap-1">
+                  <Lock size={12} className="text-slate-400 shrink-0" />
+                  <span>שחרור קבצים מוגנים בסיסמה</span>
+                </span>
               </div>
 
             </div>
@@ -460,6 +507,14 @@ const PDFEditor = () => {
         onClose={() => setShowSignatureModal(false)}
         onSubmit={addElement}
         clickPosition={clickPosition}
+      />
+
+      <DecryptModal
+        show={!!pendingEncryptedFile}
+        fileName={pendingEncryptedFile?.fileName || ''}
+        onSubmit={handleDecryptSubmit}
+        onClose={handleDecryptCancel}
+        error={decryptError}
       />
 
       {/* Success Save Toast Notification */}
