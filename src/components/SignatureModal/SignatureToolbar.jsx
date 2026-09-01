@@ -8,6 +8,12 @@ const SignatureToolbar = ({ mode, setMode, signatureColor, setSignatureColor, fo
     const handleFileChange = (e) => {
         const file = e.target.files?.[0];
         if (file && onUploadImage) {
+            const isPng = file.type === 'image/png' || file.name.toLowerCase().endsWith('.png');
+            if (!isPng) {
+                alert('ניתן להעלות קבצי תמונה בפורמט PNG בלבד.');
+                e.target.value = null;
+                return;
+            }
             onUploadImage(file);
         }
         e.target.value = null;

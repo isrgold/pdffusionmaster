@@ -228,8 +228,17 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
         };
     }, [show]);
 
+    const isPngFile = (file) => {
+        if (!file) return false;
+        return file.type === 'image/png' || file.name.toLowerCase().endsWith('.png');
+    };
+
     const handleUploadSignatureFile = (file) => {
         if (!file) return;
+        if (!isPngFile(file)) {
+            alert('ניתן להעלות קבצי תמונה בפורמט PNG בלבד.');
+            return;
+        }
         const reader = new FileReader();
         reader.onload = (e) => {
             const img = new Image();
@@ -255,6 +264,10 @@ const SignatureModal = ({ show, onClose, onSubmit, clickPosition }) => {
 
     const handleImageUploadInCreate = (file) => {
         if (!file) return;
+        if (!isPngFile(file)) {
+            alert('ניתן להעלות קבצי תמונה בפורמט PNG בלבד.');
+            return;
+        }
         const reader = new FileReader();
         reader.onload = (e) => {
             const img = new Image();

@@ -8,8 +8,14 @@ const SavedSignatures = ({ savedSignatures, onInsert, onDelete, onUpload, onRena
     const [editName, setEditName] = React.useState('');
 
     const handleFileChange = (e) => {
-        const file = e.target.files[0];
+        const file = e.target.files?.[0];
         if (file) {
+            const isPng = file.type === 'image/png' || file.name.toLowerCase().endsWith('.png');
+            if (!isPng) {
+                alert('ניתן להעלות קבצי תמונה בפורמט PNG בלבד.');
+                e.target.value = null;
+                return;
+            }
             onUpload(file);
         }
         e.target.value = null; // Reset input
