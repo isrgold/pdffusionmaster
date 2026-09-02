@@ -19,6 +19,7 @@
   color utility to any element that depends on these defaults.
 */
 @layer base {
+
   *,
   ::after,
   ::before,
@@ -30,7 +31,8 @@
 
 @layer base {
   :root {
-    --radius: 0.75rem; /* rounded-xl by default */
+    --radius: 0.75rem;
+    /* rounded-xl by default */
   }
 
   body {

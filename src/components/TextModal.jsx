@@ -124,7 +124,7 @@ const TextModal = ({ show, onClose, onSubmit, clickPosition }) => {
   return (
     <div className="fixed inset-0 bg-slate-900/35 backdrop-blur-xs flex items-center justify-center z-50 p-4 font-sans" dir="rtl">
       <div className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
-        
+
         {/* Modal Header */}
         <div className="flex justify-between items-center mb-5 pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2.5">
@@ -188,11 +188,10 @@ const TextModal = ({ show, onClose, onSubmit, clickPosition }) => {
                     key={size}
                     type="button"
                     onClick={() => setFontSize(size)}
-                    className={`px-2 py-0.5 text-[11px] font-semibold rounded-md border transition-all ${
-                      fontSize === size
+                    className={`px-2 py-0.5 text-[11px] font-semibold rounded-md border transition-all ${fontSize === size
                         ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
                         : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
-                    }`}
+                      }`}
                   >
                     {size}
                   </button>
@@ -223,11 +222,10 @@ const TextModal = ({ show, onClose, onSubmit, clickPosition }) => {
                     type="button"
                     onClick={() => setTextColor(c)}
                     style={{ backgroundColor: c }}
-                    className={`w-7 h-7 rounded-lg border transition-transform ${
-                      textColor.toLowerCase() === c.toLowerCase()
+                    className={`w-7 h-7 rounded-lg border transition-transform ${textColor.toLowerCase() === c.toLowerCase()
                         ? 'ring-2 ring-blue-500 ring-offset-2 scale-110'
                         : 'border-slate-300 hover:scale-105'
-                    }`}
+                      }`}
                   />
                 ))}
               </div>
