@@ -4,14 +4,14 @@ import { Upload, CheckCircle, Lock } from 'lucide-react';
 import Toolbar from './components/Toolbar';
 import PDFViewer from './components/PDFViewer';
 import PageManager from './components/PageManager';
-import TextModal from './components/TextModal';
-import SignatureModal from './components/SignatureModal/SignatureModal';
 import Header from './components/Header';
 import Logo from './components/Logo';
-import DecryptModal from './components/DecryptModal';
-import { isEncrypted, decryptPDF } from '@pdfsmaller/pdf-decrypt';
 import { loadPDFLibraries, getPdfJs } from './utils/pdfUtils';
 import { downloadPDF } from './utils/downloadUtils';
+
+const TextModal = React.lazy(() => import('./components/TextModal'));
+const SignatureModal = React.lazy(() => import('./components/SignatureModal/SignatureModal'));
+const DecryptModal = React.lazy(() => import('./components/DecryptModal'));
 
 const PDFEditor = () => {
   // Documents state: { [docId]: { data: Uint8Array, fileName: string } }
@@ -106,6 +106,7 @@ const PDFEditor = () => {
     if (!pendingEncryptedFile) return;
     setDecryptError('');
     try {
+      const { decryptPDF } = await import('@pdfsmaller/pdf-decrypt');
       const decrypted = await decryptPDF(pendingEncryptedFile.pdfBytes, password);
       pendingEncryptedFile.resolve(decrypted);
       setPendingEncryptedFile(null);
@@ -134,6 +135,7 @@ const PDFEditor = () => {
       const docId = generateId();
 
       try {
+        const { isEncrypted } = await import('@pdfsmaller/pdf-decrypt');
         const encInfo = await isEncrypted(pdfBytes);
         if (encInfo && encInfo.encrypted) {
           const decryptedBytes = await requestDecryption(file.name, pdfBytes);
@@ -495,27 +497,35 @@ const PDFEditor = () => {
         </div>
       </div>
 
-      <TextModal
-        show={showTextModal}
-        onClose={() => setShowTextModal(false)}
-        onSubmit={addElement}
-        clickPosition={clickPosition}
-      />
+      <React.Suspense fallback={null}>
+        {showTextModal && (
+          <TextModal
+            show={showTextModal}
+            onClose={() => setShowTextModal(false)}
+            onSubmit={addElement}
+            clickPosition={clickPosition}
+          />
+        )}
 
-      <SignatureModal
-        show={showSignatureModal}
-        onClose={() => setShowSignatureModal(false)}
-        onSubmit={addElement}
-        clickPosition={clickPosition}
-      />
+        {showSignatureModal && (
+          <SignatureModal
+            show={showSignatureModal}
+            onClose={() => setShowSignatureModal(false)}
+            onSubmit={addElement}
+            clickPosition={clickPosition}
+          />
+        )}
 
-      <DecryptModal
-        show={!!pendingEncryptedFile}
-        fileName={pendingEncryptedFile?.fileName || ''}
-        onSubmit={handleDecryptSubmit}
-        onClose={handleDecryptCancel}
-        error={decryptError}
-      />
+        {pendingEncryptedFile && (
+          <DecryptModal
+            show={!!pendingEncryptedFile}
+            fileName={pendingEncryptedFile?.fileName || ''}
+            onSubmit={handleDecryptSubmit}
+            onClose={handleDecryptCancel}
+            error={decryptError}
+          />
+        )}
+      </React.Suspense>
 
       {/* Success Save Toast Notification */}
       {showSaveSuccess && (
