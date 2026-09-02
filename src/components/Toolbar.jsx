@@ -1,6 +1,6 @@
 // components/Toolbar.jsx
 import React from 'react';
-import { Move, Type, PenTool, Trash2, Download, Eraser, PanelLeft, RotateCw } from 'lucide-react';
+import { Move, Type, PenTool, Trash2, Download, Eraser, PanelLeft, RotateCw, Zap } from 'lucide-react';
 
 const ToolButton = ({ active, onClick, icon: Icon, label }) => (
   <button
@@ -44,6 +44,7 @@ const Toolbar = ({
   deleteSelectedElement,
   clearPageElements,
   downloadPDF,
+  onOpenCompress,
   hasElements,
   isDownloading,
   showSidebar,
@@ -109,7 +110,23 @@ const Toolbar = ({
         </div>
 
         {/* Main Actions */}
-        <div className="pr-2 sm:pr-3 whitespace-nowrap">
+        <div className="pr-2 sm:pr-3 whitespace-nowrap flex items-center gap-2">
+          <button
+            onClick={onOpenCompress}
+            disabled={!hasElements || isDownloading}
+            className={`
+              flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all border
+              ${(!hasElements || isDownloading)
+                ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 hover:border-amber-300 active:scale-[0.98]'
+              }
+            `}
+            title="דחיסה והקטנת נפח ה-PDF"
+          >
+            <Zap size={16} className="text-amber-600" />
+            <span>דחוס PDF</span>
+          </button>
+
           <button
             onClick={downloadPDF}
             disabled={!hasElements || isDownloading}

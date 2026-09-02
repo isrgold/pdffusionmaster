@@ -7,11 +7,12 @@ import PageManager from './components/PageManager';
 import Header from './components/Header';
 import Logo from './components/Logo';
 import { loadPDFLibraries, getPdfJs } from './utils/pdfUtils';
-import { downloadPDF } from './utils/downloadUtils';
+import { downloadPDF, generateMergedPDFBytes } from './utils/downloadUtils';
 
 const TextModal = React.lazy(() => import('./components/TextModal'));
 const SignatureModal = React.lazy(() => import('./components/SignatureModal/SignatureModal'));
 const DecryptModal = React.lazy(() => import('./components/DecryptModal'));
+const CompressModal = React.lazy(() => import('./components/CompressModal'));
 
 const PDFEditor = () => {
   // Documents state: { [docId]: { data: Uint8Array, fileName: string } }
@@ -34,6 +35,8 @@ const PDFEditor = () => {
   // Modal states
   const [showTextModal, setShowTextModal] = useState(false);
   const [showSignatureModal, setShowSignatureModal] = useState(false);
+  const [showCompressModal, setShowCompressModal] = useState(false);
+  const [compressPdfData, setCompressPdfData] = useState({ pdfBytes: null, fileName: '' });
   const [clickPosition, setClickPosition] = useState({ x: 0, y: 0 });
   const [pendingEncryptedFile, setPendingEncryptedFile] = useState(null);
   const [decryptError, setDecryptError] = useState('');
@@ -319,6 +322,38 @@ const PDFEditor = () => {
     }, 20);
   };
 
+  const handleOpenCompressModal = async () => {
+    if (pages.length === 0) {
+      alert('אין עמודים לדחיסה.');
+      return;
+    }
+    setIsDownloading(true);
+    try {
+      const { pdfBytes, fileName } = await generateMergedPDFBytes({
+        documents,
+        pages,
+        elements
+      });
+
+      const activeDocIds = [...new Set(pages.map(p => p.originalDocId))];
+      const rawOriginalFileSize = activeDocIds.reduce((sum, docId) => {
+        return sum + (documents[docId]?.data?.byteLength || 0);
+      }, 0);
+
+      setCompressPdfData({
+        pdfBytes,
+        fileName,
+        originalFileSize: rawOriginalFileSize || pdfBytes.byteLength
+      });
+      setShowCompressModal(true);
+    } catch (err) {
+      console.error('Error preparing PDF for compression:', err);
+      alert(`שגיאה בהכנת הקובץ לדחיסה: ${err.message}`);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   const handlePageSelect = (index) => {
     if (pages[index]) {
       const pageId = pages[index].id;
@@ -423,7 +458,7 @@ const PDFEditor = () => {
 
               {/* Supported formats info */}
               <div className="mt-8 text-xs text-slate-400 flex flex-wrap items-center justify-center gap-3 sm:gap-4">
-                <span>תומך בפורמט PDF</span>
+                <span>דחיסת קבצים</span>
                 <span>•</span>
                 <span>מיזוג קבצים מרובים</span>
                 <span>•</span>
@@ -445,6 +480,7 @@ const PDFEditor = () => {
                   deleteSelectedElement={deleteSelectedElement}
                   clearPageElements={clearPageElements}
                   downloadPDF={handleDownloadPDF}
+                  onOpenCompress={handleOpenCompressModal}
                   onRotatePage={() => {
                     if (currentPageId) {
                       setPages(prev => prev.map(p =>
@@ -523,6 +559,20 @@ const PDFEditor = () => {
             onSubmit={handleDecryptSubmit}
             onClose={handleDecryptCancel}
             error={decryptError}
+          />
+        )}
+
+        {showCompressModal && (
+          <CompressModal
+            show={showCompressModal}
+            onClose={() => setShowCompressModal(false)}
+            pdfBytes={compressPdfData.pdfBytes}
+            fileName={compressPdfData.fileName}
+            originalFileSize={compressPdfData.originalFileSize}
+            onSaveSuccess={() => {
+              setShowSaveSuccess(true);
+              setTimeout(() => setShowSaveSuccess(false), 3500);
+            }}
           />
         )}
       </React.Suspense>
